@@ -28,9 +28,9 @@ export const readingA2: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Nadia må gå til et nytt legesenter.",
-        answer: false,
-        explanation: "Jonas Berg jobber «på det samme legesenteret», så hun trenger ikke å bytte adresse.",
+        prompt: "Den nye fastlegen jobber på det samme legesenteret.",
+        answer: true,
+        explanation: "Jonas Berg jobber «på det samme legesenteret», så Nadia trenger ikke å bytte adresse.",
       },
       {
         kind: "choice",
@@ -81,9 +81,9 @@ export const readingA2: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Du skal gi vaskelisten til styret når du er ferdig.",
-        answer: false,
-        explanation: "Du skal gi vaskelisten «til naboen din». Styret kontakter du bare hvis du har spørsmål.",
+        prompt: "Når du er ferdig, skal du gi vaskelisten til naboen.",
+        answer: true,
+        explanation: "Det står: «Når du er ferdig, gir du vaskelisten til naboen din.»",
       },
     ],
   },
@@ -230,8 +230,8 @@ export const readingA2: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Du må ha jobbet på kafé før.",
-        answer: false,
+        prompt: "Det er ikke et krav at du har jobbet på kafé før.",
+        answer: true,
         explanation: "Erfaring er «en fordel, men ikke et krav».",
       },
       {
@@ -367,9 +367,9 @@ export const readingA2: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Du kan bytte badetøy.",
-        answer: false,
-        explanation: "«Undertøy og badetøy kan ikke byttes.»",
+        prompt: "Undertøy kan ikke byttes.",
+        answer: true,
+        explanation: "Det står: «Undertøy og badetøy kan ikke byttes.»",
       },
     ],
   },
@@ -759,9 +759,9 @@ export const readingA2: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Det koster penger å være medlem.",
-        answer: false,
-        explanation: "«Det er gratis å være medlem.»",
+        prompt: "Det er gratis å være medlem av klubben.",
+        answer: true,
+        explanation: "Det står: «Det er gratis å være medlem.»",
       },
     ],
   },

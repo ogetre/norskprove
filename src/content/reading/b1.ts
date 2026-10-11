@@ -32,9 +32,9 @@ export const readingB1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Alle som mister jobben, får dagpenger.",
-        answer: false,
-        explanation: "Du må blant annet ha hatt en viss inntekt det siste året og være villig til å ta arbeid.",
+        prompt: "Det finnes krav du må oppfylle for å få dagpenger.",
+        answer: true,
+        explanation: "Du må blant annet ha hatt en viss inntekt det siste året og være villig til å ta de fleste typer arbeid.",
       },
       {
         kind: "choice",
@@ -78,9 +78,9 @@ export const readingB1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Mat med «best før» må kastes etter datoen.",
-        answer: false,
-        explanation: "Maten er ofte god «lenge etter» best før-datoen. Du bør se, lukte og smake før du kaster.",
+        prompt: "Mat er ofte god å spise etter «best før»-datoen.",
+        answer: true,
+        explanation: "Maten er god til datoen, «men ofte også lenge etter». Du bør se, lukte og smake før du kaster.",
       },
       {
         kind: "choice",
@@ -229,8 +229,8 @@ export const readingB1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Det er vanlig å ha lang lunsj i Norge.",
-        answer: false,
+        prompt: "Lunsjpausen er ofte kort på norske arbeidsplasser.",
+        answer: true,
         explanation: "Lunsjen er kort, «ofte bare en halvtime».",
       },
       {
@@ -429,8 +429,8 @@ export const readingB1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Posten sender noen ganger lenker for betaling i SMS.",
-        answer: false,
+        prompt: "Ifølge politiet ber Posten aldri om betaling via lenker i SMS.",
+        answer: true,
         explanation: "Politibetjenten sier: «Posten ber aldri om betaling via lenker i SMS.»",
       },
       {
@@ -531,9 +531,9 @@ export const readingB1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Utleieren kan sette depositumet inn på sin egen konto.",
-        answer: false,
-        explanation: "«Utleieren har ikke lov til å ha pengene på sin egen konto.»",
+        prompt: "Depositumet skal stå på en egen konto i leietakerens navn.",
+        answer: true,
+        explanation: "Depositumet skal settes inn på en egen depositumskonto «i leietakerens navn».",
       },
       {
         kind: "choice",
@@ -1118,9 +1118,9 @@ export const readingB1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Du kan reklamere selv om du har ødelagt varen selv.",
-        answer: false,
-        explanation: "«Reklamasjon gjelder ikke hvis du selv har ødelagt varen.»",
+        prompt: "Du kan ikke reklamere hvis du selv har ødelagt varen.",
+        answer: true,
+        explanation: "Det står: «Reklamasjon gjelder ikke hvis du selv har ødelagt varen.»",
       },
     ],
   },

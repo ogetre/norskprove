@@ -63,9 +63,9 @@ export const readingA1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Du kan bade på søndag.",
-        answer: false,
-        explanation: "Svømmehallen er stengt på søndag.",
+        prompt: "Svømmehallen er stengt på søndag.",
+        answer: true,
+        explanation: "Det står: «Søndag: stengt.»",
       },
       {
         kind: "choice",
@@ -144,9 +144,9 @@ export const readingA1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Strøm er med i prisen.",
-        answer: false,
-        explanation: "Det står: «Strøm er ikke inkludert.» Du må betale strøm i tillegg.",
+        prompt: "Du må betale strøm i tillegg til husleien.",
+        answer: true,
+        explanation: "Det står: «Strøm er ikke inkludert.» Derfor må du betale strøm i tillegg.",
       },
       {
         kind: "choice",
@@ -233,9 +233,9 @@ export const readingA1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Barna kan komme til barnehagen klokka 10 på torsdag.",
-        answer: false,
-        explanation: "Barna må være i barnehagen før klokka 9, fordi de går på tur da.",
+        prompt: "Barna må være i barnehagen før klokka 9 på torsdag.",
+        answer: true,
+        explanation: "Det står: «Barna må være i barnehagen før klokka 9.» De går på tur da.",
       },
     ],
   },
@@ -451,8 +451,8 @@ export const readingA1: ReadingTask[] = [
       },
       {
         kind: "truefalse",
-        prompt: "Det regner på søndag.",
-        answer: false,
+        prompt: "Det blir ikke regn på søndag.",
+        answer: true,
         explanation: "På søndag blir det «oppholdsvær». Det betyr at det ikke regner.",
       },
     ],
