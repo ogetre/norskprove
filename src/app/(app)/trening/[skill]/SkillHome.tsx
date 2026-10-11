@@ -5,8 +5,10 @@ import { useState } from "react";
 import { LevelFilter, levelCounts, type LevelChoice } from "@/components/LevelFilter";
 import { ResultsChart, type ResultPoint } from "@/components/ResultsChart";
 import { SkillIcon } from "@/components/SkillIcon";
+import { UnfinishedNote } from "@/components/SkillOverview";
 import { estimateLevel } from "@/lib/levels";
 import { useAppState, useHydrated } from "@/lib/store";
+import { useHasUnfinished } from "@/lib/unfinished";
 import { LEVELS, QUESTION_KIND_NAMES, SKILL_NAMES, type Level, type QuestionKind, type Skill } from "@/lib/types";
 
 type TaskMeta = { id: string; title: string; level: Level; genre: string; kinds: QuestionKind[] };
@@ -44,6 +46,7 @@ export function SkillHome({
   const state = useAppState();
   const hydrated = useHydrated();
   const [filter, setFilter] = useState<LevelChoice>("alle");
+  const unfinished = useHasUnfinished(skill);
   const [shown, setShown] = useState(PAGE);
   const attempts = hydrated ? state.attempts.filter((a) => a.skill === skill) : [];
   const level = hydrated ? estimateLevel(state, skill) : undefined;
@@ -135,12 +138,13 @@ export function SkillHome({
                     Som på prøvedagen: {fullMinutes} minutter, tidtaker og to deler. Del 1 avgjør
                     om du får A1–A2- eller B1–B2-oppgaver i del 2. Du får nivå og gjennomgang til slutt.
                   </p>
+                  {unfinished && <UnfinishedNote />}
                 </div>
                 <Link
                   href={`/trening/${skill}/prove`}
                   className="shrink-0 self-start rounded-md bg-rorbu px-6 py-3 font-medium text-white transition-colors hover:bg-[#a03022] md:self-auto"
                 >
-                  Start delprøven
+                  {unfinished ? "Fortsett delprøven" : "Start delprøven"}
                 </Link>
               </div>
             </div>

@@ -14,6 +14,9 @@ const RATE: Record<Level, number> = { A1: 0.85, A2: 0.9, B1: 0.95, B2: 1 };
 
 type Phase = "overview" | "ask" | "record" | "result";
 
+/** Answers so far in a full oral test, saved so it can be continued from the next question. */
+export type SessionProgress = { answers: Answer[][]; typedMode: boolean };
+
 function Examiner({ speaking, label }: { speaking: boolean; label: string }) {
   return (
     <div className="flex items-center gap-4">
@@ -143,26 +146,28 @@ function TaskResult({ task, answers, checks }: { task: SpeakingTask; answers: An
   );
 }
 
-function Session({
-  tasks,
-  mode,
-  fullscreen,
-  after,
-  title,
-}: {
+type SessionProps = {
   tasks: SpeakingTask[];
   mode: Mode;
   fullscreen: boolean;
   after?: ReactNode;
   title: string;
-}) {
+  /** Continue from the first unanswered question. */
+  resume?: SessionProgress;
+  /** Called whenever an answer is given, so the session can be saved and continued later. */
+  onProgress?: (progress: SessionProgress) => void;
+  /** Called when the last answer is given. */
+  onFinish?: () => void;
+};
+
+function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, onFinish }: SessionProps) {
   const voices = useNorwegianVoices();
   const rec = useRecorder();
-  const [ti, setTi] = useState(0);
-  const [qi, setQi] = useState(0);
+  const [answers, setAnswers] = useState<Answer[][]>(() => resume?.answers ?? tasks.map(() => []));
+  const [ti, setTi] = useState(() => Math.max(0, answers.findIndex((row, i) => row.length < tasks[i].questions.length)));
+  const [qi, setQi] = useState(() => answers[ti].length);
   const [phase, setPhase] = useState<Phase>("overview");
-  const [answers, setAnswers] = useState<Answer[][]>(() => tasks.map(() => []));
-  const [typedMode, setTypedMode] = useState(false);
+  const [typedMode, setTypedMode] = useState(resume?.typedMode ?? false);
   const [typed, setTyped] = useState("");
   const [deadline, setDeadline] = useState(0);
   const [now, setNow] = useState(0);
@@ -173,6 +178,14 @@ function Session({
 
   const task = tasks[ti];
   const question = task.questions[qi];
+
+  // Recordings can't be kept after the page closes, so only the text of each answer is saved.
+  useEffect(() => {
+    const complete = answers.every((row, i) => row.length >= tasks[i].questions.length);
+    if (phase !== "result" && !complete) {
+      onProgress?.({ answers: answers.map((row) => row.map((a) => ({ ...a, url: null }))), typedMode });
+    }
+  }, [answers, tasks, typedMode, phase, onProgress]);
 
   useEffect(() => {
     if (phase !== "overview" && phase !== "record") return;
@@ -189,6 +202,7 @@ function Session({
   );
 
   const finishAll = (all: Answer[][]) => {
+    onFinish?.();
     const res = tasks.map((t, i) => all[i].map((a) => checkAnswer(t, a)));
     tasks.forEach((t, i) => {
       const flat = res[i].flat();
@@ -334,7 +348,7 @@ function Session({
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <button
               type="button"
-              onClick={() => void ask(ti, 0)}
+              onClick={() => void ask(ti, qi)}
               className="rounded-md bg-rorbu px-6 py-3 font-medium text-white transition-colors hover:bg-[#a03022]"
             >
               Jeg er klar
@@ -436,13 +450,7 @@ function Session({
 }
 
 /** Spoken practice: the examiner asks out loud, you answer into the microphone. */
-export function SpeakingSession(props: {
-  tasks: SpeakingTask[];
-  mode: Mode;
-  fullscreen?: boolean;
-  after?: ReactNode;
-  title: string;
-}) {
+export function SpeakingSession(props: Omit<SessionProps, "fullscreen"> & { fullscreen?: boolean }) {
   const hydrated = useHydrated();
   if (!hydrated) return <div className="h-80 animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
   return <Session {...props} fullscreen={props.fullscreen ?? false} />;

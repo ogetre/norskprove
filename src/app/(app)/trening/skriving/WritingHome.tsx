@@ -31,6 +31,7 @@ export function WritingHome({ groups, bands }: { groups: Group[]; bands: string[
       <SkillOverview skill="skriving" official="Skriftlig framstilling" />
 
       <FullTestBanner
+        skill="skriving"
         href="/trening/skriving/prove"
         title="Full delprøve"
         text={`Velg nivå som på prøven: ${bands.join(", ")}. Du skriver flere tekster med felles tidtaker og uten stavekontroll.`}

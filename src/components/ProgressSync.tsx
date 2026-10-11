@@ -13,6 +13,7 @@ import {
   setOwner,
 } from "@/lib/store";
 import type { AppState } from "@/lib/types";
+import { clearAllUnfinished } from "@/lib/unfinished";
 
 export type SyncStatus = "guest" | "loading" | "saving" | "saved" | "error";
 
@@ -99,6 +100,7 @@ export function ProgressSync() {
 
       // Progress left by another account on this device is not merged in.
       const owner = getOwner();
+      if (owner && owner !== userId) clearAllUnfinished();
       const local = owner && owner !== userId ? initialState : getState();
       const merged = remote ? mergeStates(local, remote) : local;
       setOwner(userId);

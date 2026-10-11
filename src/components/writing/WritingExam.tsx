@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ResumeCard } from "@/components/ResumeCard";
 import type { WritingTask } from "@/content/writing";
 import { shuffle } from "@/lib/random";
 import { addWriting, recordAttempt } from "@/lib/store";
+import { clearUnfinished, loadUnfinished, saveUnfinished, savedAtLabel } from "@/lib/unfinished";
 import { checkWriting, countWords, type Check } from "@/lib/writing-checks";
 import { TaskCard, WordMeter } from "./WritingEditor";
 import { WritingFeedback } from "./WritingFeedback";
@@ -12,6 +14,23 @@ import { clock } from "./WritingPractice";
 
 export type ExamBand = { id: string; label: string; minutes: number; tasks: WritingTask[] };
 type BandPools = { id: string; label: string; minutes: number; pools: WritingTask[][] };
+type Saved = {
+  band: { id: string; label: string; minutes: number; tasks: string[] };
+  texts: string[];
+  current: number;
+  /** Milliseconds left on the clock. */
+  remaining: number;
+  savedAt: string;
+};
+
+/** The saved test with its prompts, or null if it is missing or no longer fits the prompts. */
+function restore(saved: Saved | null, pools: BandPools[]): (Saved & { exam: ExamBand }) | null {
+  if (!saved) return null;
+  const byId = new Map(pools.flatMap((b) => b.pools.flat()).map((t) => [t.id, t]));
+  const tasks = saved.band.tasks.map((id) => byId.get(id)).filter((t): t is WritingTask => t !== undefined);
+  if (tasks.length !== saved.band.tasks.length || saved.texts.length !== tasks.length) return null;
+  return { ...saved, exam: { id: saved.band.id, label: saved.band.label, minutes: saved.band.minutes, tasks } };
+}
 
 export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
   // A new prompt per slot each visit. Paywall mounts this on the client only, so the draw
@@ -19,6 +38,7 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
   const [bands] = useState<ExamBand[]>(() =>
     pools.map(({ pools: slots, ...b }) => ({ ...b, tasks: slots.map((p) => shuffle(p)[0]) })),
   );
+  const [saved, setSaved] = useState(() => restore(loadUnfinished<Saved>("skriving"), pools));
   const [band, setBand] = useState<ExamBand | null>(null);
   const [phase, setPhase] = useState<"choose" | "write" | "result">("choose");
   const [texts, setTexts] = useState<string[]>([]);
@@ -42,6 +62,7 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
   const finish = () => {
     if (!band || done.current) return;
     done.current = true;
+    clearUnfinished("skriving");
     const all = band.tasks.map((task, i) => checkWriting(task, texts[i]));
     band.tasks.forEach((task, i) => {
       const passed = all[i].filter((c) => c.ok).length;
@@ -61,11 +82,53 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
   }, [phase]);
 
   const remaining = deadline - now;
+
+  // Save the texts and the clock every tick, so the test can be continued later.
+  useEffect(() => {
+    if (phase !== "write" || !band || now === 0) return;
+    saveUnfinished("skriving", {
+      band: { id: band.id, label: band.label, minutes: band.minutes, tasks: band.tasks.map((t) => t.id) },
+      texts,
+      current,
+      remaining: Math.max(0, deadline - now),
+      savedAt: new Date().toISOString(),
+    } satisfies Saved);
+  }, [phase, band, texts, current, deadline, now]);
+
   useEffect(() => {
     if (phase === "write" && now > 0 && remaining <= 0) finish();
     // finish reads the latest texts; only the clock should trigger this
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining, phase]);
+
+  if ((phase === "choose" || !band) && saved) {
+    const words = saved.texts.reduce((n, t) => n + countWords(t), 0);
+    return (
+      <ResumeCard
+        label="Full delprøve i skriving"
+        details={[
+          `${saved.band.label}, lagret ${savedAtLabel(saved.savedAt)}`,
+          `Oppgave ${saved.current + 1} av ${saved.exam.tasks.length}, ${words} ord skrevet`,
+          `${clock(saved.remaining)} igjen på klokka`,
+        ]}
+        onContinue={() => {
+          const t = Date.now();
+          setBand(saved.exam);
+          setTexts(saved.texts);
+          setCurrent(saved.current);
+          setDeadline(t + saved.remaining);
+          setNow(t);
+          done.current = false;
+          setSaved(null);
+          setPhase("write");
+        }}
+        onRestart={() => {
+          clearUnfinished("skriving");
+          setSaved(null);
+        }}
+      />
+    );
+  }
 
   if (phase === "choose" || !band) {
     return (

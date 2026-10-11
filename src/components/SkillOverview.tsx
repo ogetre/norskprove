@@ -6,6 +6,7 @@ import { SkillIcon } from "./SkillIcon";
 import { estimateLevel } from "@/lib/levels";
 import { useAppState, useHydrated } from "@/lib/store";
 import { LEVELS, SKILL_NAMES, type Skill } from "@/lib/types";
+import { useHasUnfinished } from "@/lib/unfinished";
 
 const MODE_NAME = { quick: "Øving", full: "Full delprøve", trial: "Prøvetest", text: "Oppgave" } as const;
 
@@ -83,7 +84,8 @@ export function SkillOverview({ skill, official }: { skill: Skill; official: str
 }
 
 /** Dark banner that starts the full, exam-like test for a skill. */
-export function FullTestBanner({ href, title, text }: { href: string; title: string; text: string }) {
+export function FullTestBanner({ skill, href, title, text }: { skill: Skill; href: string; title: string; text: string }) {
+  const unfinished = useHasUnfinished(skill);
   return (
     <section className="mt-12" aria-label={title}>
       <div className="relative overflow-hidden rounded-2xl bg-fjord-deep p-7 text-snow sm:p-9">
@@ -94,15 +96,26 @@ export function FullTestBanner({ href, title, text }: { href: string; title: str
           <div className="max-w-xl">
             <h2 className="font-display text-2xl font-medium tracking-tight sm:text-3xl">{title}</h2>
             <p className="mt-3 leading-relaxed text-mist">{text}</p>
+            {unfinished && <UnfinishedNote />}
           </div>
           <Link
             href={href}
             className="shrink-0 self-start rounded-md bg-rorbu px-6 py-3 font-medium text-white transition-colors hover:bg-[#a03022] md:self-auto"
           >
-            Start delprøven
+            {unfinished ? "Fortsett delprøven" : "Start delprøven"}
           </Link>
         </div>
       </div>
     </section>
+  );
+}
+
+/** Shown on a full-test banner when a test was left unfinished on this device. */
+export function UnfinishedNote() {
+  return (
+    <p className="mt-4 inline-flex items-center gap-2 rounded-md bg-white/10 px-3 py-1.5 text-sm text-ice">
+      <span aria-hidden="true" className="size-2 rounded-full bg-[#f0b04a]" />
+      Du har en uferdig delprøve. Du kan fortsette eller starte en ny.
+    </p>
   );
 }

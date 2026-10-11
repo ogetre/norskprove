@@ -1,19 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { SpeakingSession } from "@/components/speaking/SpeakingSession";
+import { useCallback, useState } from "react";
+import { ResumeCard } from "@/components/ResumeCard";
+import { SpeakingSession, type SessionProgress } from "@/components/speaking/SpeakingSession";
 import { SPEAKING_KIND_NAMES, type SpeakingTask } from "@/content/speaking";
 import { shuffle } from "@/lib/random";
+import { clearUnfinished, loadUnfinished, saveUnfinished, savedAtLabel } from "@/lib/unfinished";
 
 type Band = { id: string; label: string; tasks: SpeakingTask[] };
 type BandPools = { id: string; label: string; pools: SpeakingTask[][] };
+type Saved = SessionProgress & { band: { id: string; label: string; tasks: string[] }; savedAt: string };
+
+/** The saved test with its prompts, or null if it is missing, finished or no longer fits the prompts. */
+function restore(saved: Saved | null, pools: BandPools[]): (Saved & { exam: Band }) | null {
+  if (!saved) return null;
+  const byId = new Map(pools.flatMap((b) => b.pools.flat()).map((t) => [t.id, t]));
+  const tasks = saved.band.tasks.map((id) => byId.get(id)).filter((t): t is SpeakingTask => t !== undefined);
+  if (tasks.length !== saved.band.tasks.length || saved.answers.length !== tasks.length) return null;
+  if (tasks.every((t, i) => saved.answers[i].length >= t.questions.length)) return null;
+  return { ...saved, exam: { id: saved.band.id, label: saved.band.label, tasks } };
+}
 
 export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
   // A new prompt per part each visit. Paywall mounts this on the client only, so the draw
   // never has to match a server render.
   const [bands] = useState<Band[]>(() => pools.map(({ pools: parts, ...b }) => ({ ...b, tasks: parts.map((p) => shuffle(p)[0]) })));
   const [band, setBand] = useState<Band | null>(null);
+  const [saved, setSaved] = useState(() => restore(loadUnfinished<Saved>("muntlig"), pools));
+  const [resume, setResume] = useState<SessionProgress | undefined>(undefined);
+
+  const save = useCallback(
+    (progress: SessionProgress) => {
+      if (!band) return;
+      saveUnfinished("muntlig", {
+        ...progress,
+        band: { id: band.id, label: band.label, tasks: band.tasks.map((t) => t.id) },
+        savedAt: new Date().toISOString(),
+      } satisfies Saved);
+    },
+    [band],
+  );
+  const finish = useCallback(() => clearUnfinished("muntlig"), []);
 
   if (band) {
     return (
@@ -22,11 +50,40 @@ export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
         mode="full"
         fullscreen
         title={`Muntlig prøve ${band.label}`}
+        resume={resume}
+        onProgress={save}
+        onFinish={finish}
         after={
           <Link href="/trening/muntlig" className="inline-flex rounded-md px-5 py-2.5 font-medium text-granite ring-1 ring-ice hover:text-ink">
             Tilbake til muntlig
           </Link>
         }
+      />
+    );
+  }
+
+  if (saved) {
+    const given = saved.answers.reduce((n, row) => n + row.length, 0);
+    const total = saved.exam.tasks.reduce((n, t) => n + t.questions.length, 0);
+    const part = saved.exam.tasks.findIndex((t, i) => saved.answers[i].length < t.questions.length);
+    return (
+      <ResumeCard
+        label="Muntlig prøve"
+        heading="Du har en uferdig muntlig prøve"
+        details={[
+          `${saved.band.label}, lagret ${savedAtLabel(saved.savedAt)}`,
+          `Del ${part + 1} av ${saved.exam.tasks.length}, ${given} av ${total} svar gitt`,
+          "Du fortsetter fra neste spørsmål. Lydopptakene fra forrige gang kan ikke spilles av, men svarene dine er tatt vare på.",
+        ]}
+        onContinue={() => {
+          setResume({ answers: saved.answers, typedMode: saved.typedMode });
+          setBand(saved.exam);
+          setSaved(null);
+        }}
+        onRestart={() => {
+          clearUnfinished("muntlig");
+          setSaved(null);
+        }}
       />
     );
   }

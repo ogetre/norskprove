@@ -10,6 +10,19 @@ import { Stimulus } from "./Stimulus";
 
 export type TestResult = Level | "under A1";
 
+/** Where the learner is in a running test; saved so an unfinished test can be continued. */
+export type RunProgress = {
+  route: "easy" | "hard" | null;
+  answers: Answer[][];
+  current: number;
+  plays: number[];
+  /** Milliseconds left on the clock. */
+  remaining: number;
+};
+
+/** A saved test to continue: the clock restarts from `now` with the time that was left. */
+export type RunResume = Omit<RunProgress, "remaining"> & { deadline: number; now: number };
+
 type Props = {
   skill: Skill;
   mode: "trial" | "full";
@@ -21,6 +34,12 @@ type Props = {
   /** Rendered under the result, e.g. the subscription offer after a trial. */
   afterResult?: ReactNode;
   backHref: string;
+  /** Continue a saved test instead of showing the intro. */
+  resume?: RunResume;
+  /** Called while the test runs, so it can be saved and continued later. */
+  onProgress?: (progress: RunProgress) => void;
+  /** Called when the test is handed in. */
+  onFinish?: () => void;
 };
 
 const pct = (c: number, t: number) => (t ? c / t : 0);
@@ -73,16 +92,30 @@ function clock(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-export function TestRunner({ skill, mode, minutes, stage1, easy = [], hard = [], afterResult, backHref }: Props) {
+export function TestRunner({
+  skill,
+  mode,
+  minutes,
+  stage1,
+  easy = [],
+  hard = [],
+  afterResult,
+  backHref,
+  resume,
+  onProgress,
+  onFinish,
+}: Props) {
   const adaptive = mode === "full" && easy.length > 0 && hard.length > 0;
-  const [phase, setPhase] = useState<"intro" | "test" | "result" | "review">("intro");
-  const [tasks, setTasks] = useState<ExamTask[]>(stage1);
-  const [route, setRoute] = useState<"easy" | "hard" | null>(null);
-  const [answers, setAnswers] = useState<Answer[][]>(() => stage1.map((t) => t.questions.map(initialAnswer)));
-  const [current, setCurrent] = useState(0);
-  const [plays, setPlays] = useState<number[]>(() => stage1.map(() => 0));
-  const [deadline, setDeadline] = useState(0);
-  const [now, setNow] = useState(0);
+  const [phase, setPhase] = useState<"intro" | "test" | "result" | "review">(resume ? "test" : "intro");
+  const [tasks, setTasks] = useState<ExamTask[]>(() =>
+    resume?.route ? [...stage1, ...(resume.route === "hard" ? hard : easy)] : stage1,
+  );
+  const [route, setRoute] = useState<"easy" | "hard" | null>(resume?.route ?? null);
+  const [answers, setAnswers] = useState<Answer[][]>(() => resume?.answers ?? stage1.map((t) => t.questions.map(initialAnswer)));
+  const [current, setCurrent] = useState(resume?.current ?? 0);
+  const [plays, setPlays] = useState<number[]>(() => resume?.plays ?? stage1.map(() => 0));
+  const [deadline, setDeadline] = useState(resume?.deadline ?? 0);
+  const [now, setNow] = useState(resume?.now ?? 0);
   const [dialog, setDialog] = useState<"route" | "submit" | null>(null);
   const [result, setResult] = useState<{ level: TestResult; correct: number; total: number; s1: number; s2: number | null } | null>(null);
   const topRef = useRef<HTMLDivElement>(null);
@@ -96,6 +129,7 @@ export function TestRunner({ skill, mode, minutes, stage1, easy = [], hard = [],
   const finish = (finalTasks = tasks, finalAnswers = answers, finalRoute = route) => {
     if (finishedRef.current) return;
     finishedRef.current = true;
+    onFinish?.();
     const s1 = totals(
       stage1.flatMap((t) => t.questions),
       finalAnswers.slice(0, stage1.length).flat(),
@@ -134,6 +168,12 @@ export function TestRunner({ skill, mode, minutes, stage1, easy = [], hard = [],
   }, [phase]);
 
   const remaining = deadline - now;
+
+  // Report where the learner is every tick, so leaving the page never loses more than a second.
+  useEffect(() => {
+    if (phase === "test" && now > 0) onProgress?.({ route, answers, current, plays, remaining: Math.max(0, deadline - now) });
+  }, [phase, route, answers, current, plays, deadline, now, onProgress]);
+
   useEffect(() => {
     if (phase === "test" && now > 0 && remaining <= 0) finish();
     // finish reads the latest state; only the clock should trigger this

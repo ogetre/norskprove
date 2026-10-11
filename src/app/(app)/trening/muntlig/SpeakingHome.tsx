@@ -27,6 +27,7 @@ export function SpeakingHome({ groups }: { groups: Group[] }) {
       <SkillOverview skill="muntlig" official="Muntlig prøve" />
 
       <FullTestBanner
+        skill="muntlig"
         href="/trening/muntlig/prove"
         title="Muntlig prøve"
         text="Tre deler etter hverandre, som hos sensoren: fortell om noe, et rollespill og en samtale der du sier hva du mener. Sensoren stiller spørsmålene med stemme, og du svarer i mikrofonen."

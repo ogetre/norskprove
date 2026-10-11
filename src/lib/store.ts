@@ -11,6 +11,7 @@ import type {
   SrsState,
   WritingSubmission,
 } from "./types";
+import { clearAllUnfinished } from "./unfinished";
 
 /*
  * Progress lives in localStorage for now. Every write goes through `update`,
@@ -168,6 +169,7 @@ export function reviewCard(cardId: string, next: SrsState) {
 
 export function resetProgress() {
   save(initialState);
+  clearAllUnfinished();
 }
 
 /* ---------- Account sync helpers (used by ProgressSync) ---------- */
