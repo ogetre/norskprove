@@ -546,8 +546,8 @@ export const listeningTests = {
   trial: ["hos-legen", "melding-pa-togstasjonen", "bilfritt-sentrum"],
   full: {
     minutes: 40,
-    stage1: ["planer-for-helgen", "hos-legen", "jobbintervju"],
-    easy: ["pa-kafeen", "beskjed-fra-tannlegen", "melding-pa-togstasjonen"],
-    hard: ["foreldremote", "bilfritt-sentrum", "skjermtid", "eldre-arbeidstakere"],
+    stage1: { A2: 2, B1: 1 },
+    easy: { A1: 2, A2: 1 },
+    hard: { B1: 2, B2: 2 },
   },
 };

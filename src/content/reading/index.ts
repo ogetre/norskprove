@@ -671,13 +671,13 @@ export function getReadingTask(id: string) {
   return readingTasks.find((t) => t.id === id);
 }
 
-/** Task ids for the free trial and the adaptive full test (two stages like the real exam). */
+/** Task ids for the free trial, and how many tasks per level the adaptive full test draws (two stages like the real exam). */
 export const readingTests = {
   trial: ["nye-apningstider", "kveldskurs", "en-uvanlig-morgen"],
   full: {
     minutes: 60,
-    stage1: ["e-post-fra-kollega", "kveldskurs", "til-utleieren", "tur-med-barnehagen"],
-    easy: ["beskjed-fra-laereren", "hvor-skal-de-ga", "hilsen-fra-tromso", "sykkel-til-salgs", "bestille-time", "nye-apningstider"],
-    hard: ["flere-sykler-til-jobben", "dugnad", "en-uvanlig-morgen", "hjemmekontor-som-rettighet", "fire-dager-i-uka", "klagebrev", "abonnementsfellen"],
+    stage1: { A2: 2, B1: 2 },
+    easy: { A1: 3, A2: 3 },
+    hard: { B1: 3, B2: 4 },
   },
 };

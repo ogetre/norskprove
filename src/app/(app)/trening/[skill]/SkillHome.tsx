@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { LevelFilter, levelCounts, type LevelChoice } from "@/components/LevelFilter";
 import { ResultsChart, type ResultPoint } from "@/components/ResultsChart";
 import { SkillIcon } from "@/components/SkillIcon";
 import { estimateLevel } from "@/lib/levels";
@@ -21,6 +23,9 @@ const KIND_HINT: Record<QuestionKind, string> = {
 
 const MODE_NAME = { quick: "Hurtigøving", full: "Full delprøve", trial: "Prøvetest", text: "Tekst" } as const;
 
+/** Tasks shown in the list before «Vis flere». */
+const PAGE = 20;
+
 const card = "rounded-2xl bg-surface p-5 ring-1 ring-ice sm:p-6";
 
 export function SkillHome({
@@ -38,10 +43,13 @@ export function SkillHome({
 }) {
   const state = useAppState();
   const hydrated = useHydrated();
+  const [filter, setFilter] = useState<LevelChoice>("alle");
+  const [shown, setShown] = useState(PAGE);
   const attempts = hydrated ? state.attempts.filter((a) => a.skill === skill) : [];
   const level = hydrated ? estimateLevel(state, skill) : undefined;
   const fulls = attempts.filter((a) => a.mode === "full");
   const done = new Set(attempts.map((a) => a.taskId));
+  const listed = tasks.filter((t) => filter === "alle" || t.level === filter);
 
   const points: ResultPoint[] = attempts.slice(-14).map((a) => {
     const d = new Date(a.at).toLocaleDateString("nb-NO", { day: "numeric", month: "short" }).replace(".", "");
@@ -173,11 +181,26 @@ export function SkillHome({
           </section>
 
           <section className="mt-12" aria-labelledby="texts-title">
-            <h2 id="texts-title" className="font-display text-2xl font-medium tracking-tight">
-              {skill === "lytting" ? "Alle opptak" : "Alle tekster"}
-            </h2>
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h2 id="texts-title" className="font-display text-2xl font-medium tracking-tight">
+                  {skill === "lytting" ? "Alle opptak" : "Alle tekster"}
+                </h2>
+                <p className="mt-1 text-granite tabular-nums">
+                  {listed.filter((t) => done.has(t.id)).length} av {listed.length} løst
+                </p>
+              </div>
+              <LevelFilter
+                value={filter}
+                onChange={(l) => {
+                  setFilter(l);
+                  setShown(PAGE);
+                }}
+                counts={levelCounts(tasks)}
+              />
+            </div>
             <ul className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {tasks.map((t) => (
+              {listed.slice(0, shown).map((t) => (
                 <li key={t.id}>
                   <Link
                     href={`/trening/${skill}/oppgave/${t.id}`}
@@ -195,6 +218,15 @@ export function SkillHome({
                 </li>
               ))}
             </ul>
+            {listed.length > shown && (
+              <button
+                type="button"
+                onClick={() => setShown((n) => n + PAGE)}
+                className="mt-5 rounded-md px-5 py-2.5 font-medium text-granite ring-1 ring-ice transition-colors hover:text-ink"
+              >
+                Vis flere ({listed.length - shown} igjen)
+              </button>
+            )}
           </section>
         </>
       )}

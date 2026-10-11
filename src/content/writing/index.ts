@@ -180,14 +180,45 @@ export function getWritingTask(id: string) {
   return writingTasks.find((t) => t.id === id);
 }
 
-export type WritingBand = { id: string; label: string; minutes: number; tasks: string[] };
+/** One text in a full test: drawn at random from the prompts at this level and of these kinds. */
+export type WritingSlot = { level: Level; kinds: WritingKind[] };
+export type WritingBand = { id: string; label: string; minutes: number; slots: WritingSlot[] };
 
 /** Full tests are taken at a chosen level band, like the real written exam. */
 export const writingTests = {
   trial: "bursdagsinvitasjon",
   bands: [
-    { id: "a1-a2", label: "A1–A2", minutes: 60, tasks: ["syk-melding", "der-jeg-bor"] },
-    { id: "a2-b1", label: "A2–B1", minutes: 90, tasks: ["bursdagsinvitasjon", "klage-nettbutikk"] },
-    { id: "b1-b2", label: "B1–B2", minutes: 90, tasks: ["hjemmekontor", "mobil-i-skolen"] },
+    {
+      id: "a1-a2",
+      label: "A1–A2",
+      minutes: 60,
+      slots: [
+        { level: "A1", kinds: ["e-post"] },
+        { level: "A2", kinds: ["beskrivelse", "fortelling"] },
+      ],
+    },
+    {
+      id: "a2-b1",
+      label: "A2–B1",
+      minutes: 90,
+      slots: [
+        { level: "A2", kinds: ["e-post"] },
+        { level: "B1", kinds: ["e-post", "meningstekst"] },
+      ],
+    },
+    {
+      id: "b1-b2",
+      label: "B1–B2",
+      minutes: 90,
+      slots: [
+        { level: "B1", kinds: ["e-post", "fortelling", "beskrivelse"] },
+        { level: "B2", kinds: ["meningstekst"] },
+      ],
+    },
   ] satisfies WritingBand[],
 };
+
+/** The prompts each slot of a band can draw from. */
+export function writingPools(band: WritingBand): WritingTask[][] {
+  return band.slots.map((s) => writingTasks.filter((t) => t.level === s.level && s.kinds.includes(t.kind)));
+}

@@ -184,11 +184,44 @@ export function getSpeakingTask(id: string) {
   return speakingTasks.find((t) => t.id === id);
 }
 
+/** One part of the oral test: drawn at random from the prompts of this kind and level. */
+export type SpeakingSlot = { level: Level; kind: SpeakingKind };
+export type SpeakingBand = { id: string; label: string; slots: SpeakingSlot[] };
+
 export const speakingTests = {
   trial: "om-deg-selv",
   bands: [
-    { id: "a1-a2", label: "A1–A2", tasks: ["om-deg-selv", "pa-kafeen-muntlig", "en-vanlig-dag"] },
-    { id: "a2-b1", label: "A2–B1", tasks: ["en-vanlig-dag", "ring-legekontoret", "by-eller-land"] },
-    { id: "b1-b2", label: "B1–B2", tasks: ["hjemlandet", "bytte-en-vare", "sondagsapent"] },
-  ],
+    {
+      id: "a1-a2",
+      label: "A1–A2",
+      slots: [
+        { level: "A1", kind: "presentasjon" },
+        { level: "A1", kind: "samtale" },
+        { level: "A2", kind: "mening" },
+      ],
+    },
+    {
+      id: "a2-b1",
+      label: "A2–B1",
+      slots: [
+        { level: "A2", kind: "presentasjon" },
+        { level: "A2", kind: "samtale" },
+        { level: "B1", kind: "mening" },
+      ],
+    },
+    {
+      id: "b1-b2",
+      label: "B1–B2",
+      slots: [
+        { level: "B1", kind: "presentasjon" },
+        { level: "B1", kind: "samtale" },
+        { level: "B2", kind: "mening" },
+      ],
+    },
+  ] satisfies SpeakingBand[],
 };
+
+/** The prompts each part of a band can draw from. */
+export function speakingPools(band: SpeakingBand): SpeakingTask[][] {
+  return band.slots.map((s) => speakingTasks.filter((t) => t.level === s.level && t.kind === s.kind));
+}

@@ -2,8 +2,22 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { LevelFilter, levelCounts, type LevelChoice } from "@/components/LevelFilter";
 import { TaskPractice } from "@/components/TaskPractice";
-import { LEVELS, SKILL_NAMES, type ExamTask, type Level, type QuestionKind, type Skill } from "@/lib/types";
+import { estimateLevel } from "@/lib/levels";
+import { shuffle } from "@/lib/random";
+import { useAppState } from "@/lib/store";
+import { SKILL_NAMES, type ExamTask, type QuestionKind, type Skill } from "@/lib/types";
+
+const ROUND = 8;
+
+/** A short round at the chosen level: random tasks, the ones not solved yet first. */
+function pickRound(tasks: ExamTask[], level: LevelChoice, solved: Set<string>): ExamTask[] {
+  const list = tasks.filter((t) => level === "alle" || t.level === level);
+  const fresh = list.filter((t) => !solved.has(t.id));
+  const seen = list.filter((t) => solved.has(t.id));
+  return [...shuffle(fresh), ...shuffle(seen)].slice(0, ROUND);
+}
 
 export function QuickPractice({
   skill,
@@ -16,13 +30,30 @@ export function QuickPractice({
   title: string;
   tasks: ExamTask[];
 }) {
-  const [level, setLevel] = useState<Level | "alle">("alle");
+  const state = useAppState();
+  const solved = new Set(state.attempts.filter((a) => a.skill === skill).map((a) => a.taskId));
+  const counts = levelCounts(tasks);
+  // Start at the learner's estimated level when there is one. This component only mounts
+  // on the client (inside Paywall), so the random round never has to match a server render.
+  const [level, setLevel] = useState<LevelChoice>(() => {
+    const l = estimateLevel(state, skill);
+    return l && counts[l] > 0 ? l : "alle";
+  });
+  const [round, setRound] = useState(() => pickRound(tasks, level, solved));
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState({ correct: 0, total: 0, done: 0 });
 
-  const list = tasks.filter((t) => level === "alle" || t.level === level);
-  const task = list[index];
-  const finished = index >= list.length;
+  const task = round[index];
+  const finished = index >= round.length;
+  const atLevel = tasks.filter((t) => level === "alle" || t.level === level);
+  const solvedAtLevel = atLevel.filter((t) => solved.has(t.id)).length;
+
+  const newRound = (l: LevelChoice) => {
+    setLevel(l);
+    setRound(pickRound(tasks, l, solved));
+    setIndex(0);
+    setScore({ correct: 0, total: 0, done: 0 });
+  };
 
   return (
     <>
@@ -41,36 +72,19 @@ export function QuickPractice({
           <p className="text-sm text-granite">Hurtigøving</p>
           <h1 className="font-display text-2xl font-medium tracking-tight sm:text-3xl">{title}</h1>
         </div>
-        <div role="group" aria-label="Velg nivå" className="flex flex-wrap gap-2">
-          {(["alle", ...LEVELS] as const).map((l) => {
-            const count = l === "alle" ? tasks.length : tasks.filter((t) => t.level === l).length;
-            return (
-              <button
-                key={l}
-                type="button"
-                aria-pressed={level === l}
-                disabled={count === 0}
-                onClick={() => {
-                  setLevel(l);
-                  setIndex(0);
-                  setScore({ correct: 0, total: 0, done: 0 });
-                }}
-                className="rounded-full border border-ice bg-surface px-3.5 py-1.5 text-sm transition-colors hover:border-mist disabled:opacity-35 aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-snow"
-              >
-                {l === "alle" ? "Alle" : l}
-              </button>
-            );
-          })}
-        </div>
+        <LevelFilter value={level} onChange={newRound} counts={counts} />
       </div>
 
       {!finished && (
         <div className="mt-5 flex items-center gap-3 text-sm text-granite">
           <span className="tabular-nums">
-            Oppgave {index + 1} av {list.length}
+            Oppgave {index + 1} av {round.length}
           </span>
           <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-ice">
-            <span className="block h-full rounded-full bg-fjord transition-[width] duration-500" style={{ width: `${(index / list.length) * 100}%` }} />
+            <span className="block h-full rounded-full bg-fjord transition-[width] duration-500" style={{ width: `${(index / round.length) * 100}%` }} />
+          </span>
+          <span className="hidden tabular-nums sm:inline">
+            {solvedAtLevel} av {atLevel.length} løst
           </span>
         </div>
       )}
@@ -83,16 +97,16 @@ export function QuickPractice({
               {score.correct}/{score.total}
             </p>
             <p className="mt-2 text-granite">riktige svar i {score.done} oppgaver</p>
+            <p className="mt-1 text-sm text-granite tabular-nums">
+              Du har løst {solvedAtLevel} av {atLevel.length} oppgaver {level === "alle" ? "totalt" : `på ${level}`}.
+            </p>
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setIndex(0);
-                  setScore({ correct: 0, total: 0, done: 0 });
-                }}
+                onClick={() => newRound(level)}
                 className="rounded-md bg-rorbu px-5 py-2.5 font-medium text-white hover:bg-[#a03022]"
               >
-                Øv en gang til
+                Ny runde
               </button>
               <Link href={`/trening/${skill}`} className="rounded-md px-5 py-2.5 font-medium text-granite ring-1 ring-ice hover:text-ink">
                 Tilbake til {SKILL_NAMES[skill].toLowerCase()}
@@ -116,7 +130,7 @@ export function QuickPractice({
                 }}
                 className="rounded-md bg-rorbu px-5 py-2.5 font-medium text-white transition-colors hover:bg-[#a03022]"
               >
-                {index + 1 < list.length ? "Neste oppgave" : "Se resultatet"}
+                {index + 1 < round.length ? "Neste oppgave" : "Se resultatet"}
               </button>
             )}
           />

@@ -4,10 +4,15 @@ import Link from "next/link";
 import { useState } from "react";
 import { SpeakingSession } from "@/components/speaking/SpeakingSession";
 import { SPEAKING_KIND_NAMES, type SpeakingTask } from "@/content/speaking";
+import { shuffle } from "@/lib/random";
 
 type Band = { id: string; label: string; tasks: SpeakingTask[] };
+type BandPools = { id: string; label: string; pools: SpeakingTask[][] };
 
-export function SpeakingExam({ bands }: { bands: Band[] }) {
+export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
+  // A new prompt per part each visit. Paywall mounts this on the client only, so the draw
+  // never has to match a server render.
+  const [bands] = useState<Band[]>(() => pools.map(({ pools: parts, ...b }) => ({ ...b, tasks: parts.map((p) => shuffle(p)[0]) })));
   const [band, setBand] = useState<Band | null>(null);
 
   if (band) {

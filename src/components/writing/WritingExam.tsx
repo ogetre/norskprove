@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { WritingTask } from "@/content/writing";
+import { shuffle } from "@/lib/random";
 import { addWriting, recordAttempt } from "@/lib/store";
 import { checkWriting, countWords, type Check } from "@/lib/writing-checks";
 import { TaskCard, WordMeter } from "./WritingEditor";
@@ -10,8 +11,14 @@ import { WritingFeedback } from "./WritingFeedback";
 import { clock } from "./WritingPractice";
 
 export type ExamBand = { id: string; label: string; minutes: number; tasks: WritingTask[] };
+type BandPools = { id: string; label: string; minutes: number; pools: WritingTask[][] };
 
-export function WritingExam({ bands }: { bands: ExamBand[] }) {
+export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
+  // A new prompt per slot each visit. Paywall mounts this on the client only, so the draw
+  // never has to match a server render.
+  const [bands] = useState<ExamBand[]>(() =>
+    pools.map(({ pools: slots, ...b }) => ({ ...b, tasks: slots.map((p) => shuffle(p)[0]) })),
+  );
   const [band, setBand] = useState<ExamBand | null>(null);
   const [phase, setPhase] = useState<"choose" | "write" | "result">("choose");
   const [texts, setTexts] = useState<string[]>([]);

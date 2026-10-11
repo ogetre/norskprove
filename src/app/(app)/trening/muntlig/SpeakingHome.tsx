@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { LevelFilter, levelCounts, type LevelChoice } from "@/components/LevelFilter";
 import { FullTestBanner, SkillOverview } from "@/components/SkillOverview";
 import { useAppState, useHydrated } from "@/lib/store";
 import type { Level } from "@/lib/types";
@@ -15,6 +17,10 @@ export function SpeakingHome({ groups }: { groups: Group[] }) {
   const state = useAppState();
   const hydrated = useHydrated();
   const done = new Set(hydrated ? state.attempts.filter((a) => a.skill === "muntlig").map((a) => a.taskId) : []);
+  const [level, setLevel] = useState<LevelChoice>("alle");
+  const shown = groups
+    .map((g) => ({ ...g, tasks: g.tasks.filter((t) => level === "alle" || t.level === level) }))
+    .filter((g) => g.tasks.length > 0);
 
   return (
     <>
@@ -27,13 +33,18 @@ export function SpeakingHome({ groups }: { groups: Group[] }) {
       />
 
       <section className="mt-12" aria-labelledby="speak-title">
-        <h2 id="speak-title" className="font-display text-2xl font-medium tracking-tight">
-          Øv på én oppgave
-        </h2>
-        <p className="mt-1 text-granite">Du hører spørsmålet, svarer muntlig og kan lytte til opptaket ditt etterpå.</p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 id="speak-title" className="font-display text-2xl font-medium tracking-tight">
+              Øv på én oppgave
+            </h2>
+            <p className="mt-1 text-granite">Du hører spørsmålet, svarer muntlig og kan lytte til opptaket ditt etterpå.</p>
+          </div>
+          <LevelFilter value={level} onChange={setLevel} counts={levelCounts(groups.flatMap((g) => g.tasks))} />
+        </div>
 
         <div className="mt-6 space-y-8">
-          {groups.map((g) => (
+          {shown.map((g) => (
             <div key={g.kind}>
               <h3 className="font-semibold">{g.name}</h3>
               <ul className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">

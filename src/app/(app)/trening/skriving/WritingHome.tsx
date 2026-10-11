@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { LevelFilter, levelCounts, type LevelChoice } from "@/components/LevelFilter";
 import { FullTestBanner, SkillOverview } from "@/components/SkillOverview";
 import { useAppState, useHydrated } from "@/lib/store";
 import type { Level } from "@/lib/types";
@@ -14,6 +16,10 @@ type Group = {
 export function WritingHome({ groups, bands }: { groups: Group[]; bands: string[] }) {
   const state = useAppState();
   const hydrated = useHydrated();
+  const [level, setLevel] = useState<LevelChoice>("alle");
+  const shown = groups
+    .map((g) => ({ ...g, tasks: g.tasks.filter((t) => level === "alle" || t.level === level) }))
+    .filter((g) => g.tasks.length > 0);
   const best = (id: string) => {
     if (!hydrated) return null;
     const tries = state.attempts.filter((a) => a.skill === "skriving" && a.taskId === id);
@@ -31,15 +37,20 @@ export function WritingHome({ groups, bands }: { groups: Group[]; bands: string[
       />
 
       <section className="mt-12" aria-labelledby="write-title">
-        <h2 id="write-title" className="font-display text-2xl font-medium tracking-tight">
-          Skriv en tekst
-        </h2>
-        <p className="mt-1 text-granite">
-          Velg en oppgave. Du får automatisk sjekk av kravene og en eksempeltekst å sammenligne med.
-        </p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 id="write-title" className="font-display text-2xl font-medium tracking-tight">
+              Skriv en tekst
+            </h2>
+            <p className="mt-1 text-granite">
+              Velg en oppgave. Du får automatisk sjekk av kravene og en eksempeltekst å sammenligne med.
+            </p>
+          </div>
+          <LevelFilter value={level} onChange={setLevel} counts={levelCounts(groups.flatMap((g) => g.tasks))} />
+        </div>
 
         <div className="mt-6 space-y-8">
-          {groups.map((g) => (
+          {shown.map((g) => (
             <div key={g.kind}>
               <h3 className="font-semibold">{g.name}</h3>
               <ul className="mt-3 grid gap-3 md:grid-cols-2">

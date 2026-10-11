@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Paywall } from "@/components/Access";
-import { TestRunner } from "@/components/TestRunner";
-import { content, pickTasks } from "@/content";
+import { FullTest } from "@/components/FullTest";
+import { content } from "@/content";
 import type { Skill } from "@/lib/types";
 import { PageLoading } from "@/components/PageLoading";
 
@@ -14,19 +14,10 @@ async function FullTestPageContent({ params }: { params: PageProps<"/trening/[sk
   const c = content[skill as Skill];
   if (!c) notFound();
   const s = skill as Skill;
-  const { full } = c.tests;
 
   return (
     <Paywall skill={s} feature="Full delprøve">
-      <TestRunner
-        skill={s}
-        mode="full"
-        minutes={full.minutes}
-        stage1={pickTasks(s, full.stage1)}
-        easy={pickTasks(s, full.easy)}
-        hard={pickTasks(s, full.hard)}
-        backHref={`/trening/${s}`}
-      />
+      <FullTest skill={s} tasks={c.tasks} plan={c.tests.full} />
     </Paywall>
   );
 }

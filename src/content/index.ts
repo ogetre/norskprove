@@ -1,10 +1,12 @@
 import type { ExamTask, Skill } from "@/lib/types";
+import type { Draw } from "./draw";
 import { listeningTasks, listeningTests } from "./listening";
 import { readingTasks, readingTests } from "./reading";
 
 export type TestPlan = {
   trial: string[];
-  full: { minutes: number; stage1: string[]; easy: string[]; hard: string[] };
+  /** Each full test draws new tasks: stage 1, then the easy or hard stage 2. */
+  full: { minutes: number; stage1: Draw; easy: Draw; hard: Draw };
 };
 
 type SkillContent = { tasks: ExamTask[]; tests: TestPlan; trialMinutes: number };
