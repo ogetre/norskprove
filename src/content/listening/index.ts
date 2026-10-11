@@ -1,7 +1,12 @@
 import type { ListeningTask } from "@/lib/types";
+import { listeningA1 } from "./a1";
+import { listeningA2 } from "./a2";
+import { listeningB1 } from "./b1";
+import { listeningB2 } from "./b2";
+import { byLevel } from "../order";
 
 // Original scripts written in the style of Norskprøven. Read aloud by the browser's Norwegian voice.
-export const listeningTasks: ListeningTask[] = [
+const baseTasks: ListeningTask[] = [
   {
     id: "pa-kafeen",
     level: "A1",
@@ -534,6 +539,8 @@ export const listeningTasks: ListeningTask[] = [
     ],
   },
 ];
+
+export const listeningTasks: ListeningTask[] = byLevel([...baseTasks, ...listeningA1, ...listeningA2, ...listeningB1, ...listeningB2]);
 
 export const listeningTests = {
   trial: ["hos-legen", "melding-pa-togstasjonen", "bilfritt-sentrum"],

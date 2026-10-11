@@ -1,4 +1,9 @@
 import type { Level } from "@/lib/types";
+import { speakingA1 } from "./a1";
+import { speakingA2 } from "./a2";
+import { speakingB1 } from "./b1";
+import { speakingB2 } from "./b2";
+import { byLevel } from "../order";
 
 export type SpeakingKind = "presentasjon" | "samtale" | "mening";
 
@@ -27,7 +32,7 @@ export interface SpeakingTask {
 }
 
 // Original prompts written in the style of the oral Norskprøven. Not official exam material.
-export const speakingTasks: SpeakingTask[] = [
+const baseTasks: SpeakingTask[] = [
   {
     id: "om-deg-selv",
     level: "A1",
@@ -172,6 +177,8 @@ export const speakingTasks: SpeakingTask[] = [
       "En stor fordel med nettbrett og PC er at elevene får tilgang til oppdatert informasjon og kan jobbe i sitt eget tempo. Lærerne kan også gi raskere tilbakemelding. Ulempen er imidlertid at skjermen lett blir en kilde til forstyrrelser, og mange mener at man husker bedre når man leser på papir. Jeg tror løsningen er en kombinasjon: bøker når elevene skal lese lange tekster, og digitale verktøy til oppgaver og samarbeid. Om tjue år tror jeg skolen er enda mer digital, men at det sosiale fellesskapet i klasserommet fortsatt er like viktig.",
   },
 ];
+
+export const speakingTasks: SpeakingTask[] = byLevel([...baseTasks, ...speakingA1, ...speakingA2, ...speakingB1, ...speakingB2]);
 
 export function getSpeakingTask(id: string) {
   return speakingTasks.find((t) => t.id === id);

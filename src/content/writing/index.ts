@@ -1,4 +1,9 @@
 import type { Level } from "@/lib/types";
+import { writingA1 } from "./a1";
+import { writingA2 } from "./a2";
+import { writingB1 } from "./b1";
+import { writingB2 } from "./b2";
+import { byLevel } from "../order";
 
 export type WritingKind = "e-post" | "fortelling" | "beskrivelse" | "meningstekst";
 
@@ -26,7 +31,7 @@ export interface WritingTask {
 }
 
 // Original prompts written in the style of Norskprøven. Not official exam material.
-export const writingTasks: WritingTask[] = [
+const baseTasks: WritingTask[] = [
   {
     id: "ny-leilighet",
     level: "A1",
@@ -168,6 +173,8 @@ export const writingTasks: WritingTask[] = [
       "Hei!\n\nJeg viser til annonsen deres om frivillige leksehjelpere, og jeg vil gjerne søke. Jeg heter Daniel Mekonnen, er 34 år og jobber som ingeniør i et konsulentfirma her i byen.\n\nSom barn fikk jeg selv hjelp med lekser av frivillige da familien min kom til Norge. Det betydde mye for meg, både faglig og fordi jeg følte meg sett. Nå ønsker jeg å gi noe tilbake til lokalsamfunnet.\n\nJeg har god kompetanse i matematikk og naturfag, og jeg har tidligere vært trener for et fotballag for barn. Der lærte jeg å forklare ting på en enkel måte og å være tålmodig når noe tar tid. I tillegg snakker jeg amharisk og engelsk, noe som kan være nyttig for barn som ennå ikke behersker norsk godt.\n\nJeg kan begynne i januar og har mulighet til å komme én ettermiddag i uka, gjerne tirsdager eller torsdager.\n\nJeg ser frem til å høre fra dere.\n\nVennlig hilsen\nDaniel Mekonnen",
   },
 ];
+
+export const writingTasks: WritingTask[] = byLevel([...baseTasks, ...writingA1, ...writingA2, ...writingB1, ...writingB2]);
 
 export function getWritingTask(id: string) {
   return writingTasks.find((t) => t.id === id);

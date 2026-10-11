@@ -1,7 +1,12 @@
 import type { ReadingTask } from "@/lib/types";
+import { readingA1 } from "./a1";
+import { readingA2 } from "./a2";
+import { readingB1 } from "./b1";
+import { readingB2 } from "./b2";
+import { byLevel } from "../order";
 
 // Original texts written in the style of Norskprøven. Not official exam material.
-export const readingTasks: ReadingTask[] = [
+const baseTasks: ReadingTask[] = [
   {
     id: "beskjed-fra-laereren",
     level: "A1",
@@ -659,6 +664,8 @@ export const readingTasks: ReadingTask[] = [
     ],
   },
 ];
+
+export const readingTasks: ReadingTask[] = byLevel([...baseTasks, ...readingA1, ...readingA2, ...readingB1, ...readingB2]);
 
 export function getReadingTask(id: string) {
   return readingTasks.find((t) => t.id === id);
