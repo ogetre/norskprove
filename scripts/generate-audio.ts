@@ -11,9 +11,13 @@
  * so the player only uses recordings that match the current text and falls back to the
  * browser voice for the rest.
  *
- * Google gives 1 million WaveNet characters free each month, and all the tasks together are
- * about 60 000, so recording them costs nothing. To stay well inside that, the script refuses to
- * send more than MAX_CHARS in one run unless --allow-more is given.
+ * The default voices are Chirp 3 HD, Google's most natural ones, with many Norwegian voices.
+ * --voices=Wavenet uses the older WaveNet voices instead.
+ *
+ * Google gives 1 million Chirp 3 HD characters (4 million WaveNet) free each month, and all the
+ * tasks together are about 60 000, so recording them costs nothing. To stay well inside that,
+ * the script refuses to send more than MAX_CHARS in one run or MONTH_CHARS in one month
+ * (counted in .audio-usage.json) unless --allow-more is given.
  */
 
 import { existsSync } from "node:fs";
@@ -27,7 +31,9 @@ const API = "https://texttospeech.googleapis.com/v1";
 const ROOT = path.resolve(__dirname, "..");
 const AUDIO_DIR = path.join(ROOT, "public/audio/lytting");
 const MANIFEST = path.join(ROOT, "src/content/listening/audio.json");
+const USAGE = path.join(ROOT, ".audio-usage.json");
 const MAX_CHARS = 200_000;
+const MONTH_CHARS = 800_000;
 
 type Manifest = { voices: string | null; tasks: Record<string, string> };
 type Pools = Record<VoiceGender, string[]>;
@@ -37,30 +43,45 @@ const dryRun = args.includes("--dry-run");
 const force = args.includes("--force");
 const allowMore = args.includes("--allow-more");
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length).split(",");
-/** Voice family to use. WaveNet is free up to 1 million characters a month. */
-const family = args.find((a) => a.startsWith("--voices="))?.slice("--voices=".length) ?? "Wavenet";
+/** Voice family to use. Chirp 3 HD is free up to 1 million characters a month. */
+const family = args.find((a) => a.startsWith("--voices="))?.slice("--voices=".length) ?? "Chirp3-HD";
+/** Chirp voices don't take a pitch, but they have so many voices that no task needs one. */
+const usesPitch = !family.startsWith("Chirp");
 
-/** Reads KEY=value lines from .env.local or .env when the variable isn't set already. */
+/**
+ * Reads a KEY=value line from .env.local when the variable isn't set already. Not from .env,
+ * which may be committed: the key must never end up on GitHub.
+ */
 async function env(name: string): Promise<string | undefined> {
   if (process.env[name]) return process.env[name];
-  for (const file of [".env.local", ".env"]) {
-    const p = path.join(ROOT, file);
-    if (!existsSync(p)) continue;
-    for (const line of (await readFile(p, "utf8")).split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-      if (m && m[1] === name) return m[2].replace(/^["']|["']$/g, "");
-    }
+  const p = path.join(ROOT, ".env.local");
+  if (!existsSync(p)) return undefined;
+  for (const line of (await readFile(p, "utf8")).split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (m && m[1] === name) return m[2].replace(/^["']|["']$/g, "");
   }
   return undefined;
 }
 
-async function call<T>(url: string, init?: RequestInit, tries = 4): Promise<T> {
+/** Characters sent to Google per month and voice family, so the free limit is never passed. */
+type Usage = Record<string, Record<string, number>>;
+const month = new Date().toISOString().slice(0, 7);
+
+async function readUsage(): Promise<Usage> {
+  try {
+    return JSON.parse(await readFile(USAGE, "utf8")) as Usage;
+  } catch {
+    return {};
+  }
+}
+
+async function call<T>(url: string, init?: RequestInit, tries = 6): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     const res = await fetch(url, init);
     if (res.ok) return (await res.json()) as T;
     const body = await res.text();
     if ((res.status === 429 || res.status >= 500) && attempt < tries) {
-      await new Promise((r) => setTimeout(r, 2000 * 2 ** attempt));
+      await new Promise((r) => setTimeout(r, Math.min(60_000, 2000 * 2 ** attempt)));
       continue;
     }
     throw new Error(`Google answered ${res.status}: ${body.slice(0, 400)}`);
@@ -90,7 +111,7 @@ function plan(task: ListeningTask, pools: Pools) {
     const pool = pools[c.gender];
     // When a task has more speakers of one type than there are voices, the extra ones get a
     // lower or higher pitch so they still sound like different people.
-    const round = Math.floor(c.nth / pool.length) % 3;
+    const round = usesPitch ? Math.floor(c.nth / pool.length) % 3 : 0;
     return {
       text: line.text,
       voice: pool[c.index % pool.length],
@@ -107,7 +128,12 @@ async function synthesize(key: string, p: ReturnType<typeof plan>[number]): Prom
     body: JSON.stringify({
       input: { text: p.text },
       voice: { languageCode: "nb-NO", name: p.voice },
-      audioConfig: { audioEncoding: "MP3", speakingRate: p.rate, pitch: p.pitch, sampleRateHertz: 24000 },
+      audioConfig: {
+        audioEncoding: "MP3",
+        speakingRate: p.rate,
+        ...(p.pitch ? { pitch: p.pitch } : {}),
+        sampleRateHertz: 24000,
+      },
     }),
   });
   return Buffer.from(audioContent, "base64");
@@ -143,8 +169,15 @@ async function main() {
     console.log("Dry run: nothing was sent to Google.");
     return;
   }
+  const usage = await readUsage();
+  const used = usage[month]?.[family] ?? 0;
+  if (used) console.log(`Already sent this month: ${used.toLocaleString("en")} characters.`);
   if (chars > MAX_CHARS && !allowMore) {
     console.error(`Stopped: more than ${MAX_CHARS.toLocaleString("en")} characters. Nothing was sent. Use --allow-more if you really want this.`);
+    process.exit(1);
+  }
+  if (used + chars > MONTH_CHARS && !allowMore) {
+    console.error(`Stopped: this month would pass ${MONTH_CHARS.toLocaleString("en")} characters, close to Google's free limit. Nothing was sent. Wait until next month.`);
     process.exit(1);
   }
 
@@ -170,6 +203,8 @@ async function main() {
       const batch = lines.slice(i, i + 4);
       const audio = await Promise.all(batch.map((p) => synthesize(key, p)));
       await Promise.all(audio.map((buf, j) => writeFile(path.join(dir, `${key36}-${i + j}.mp3`), buf)));
+      usage[month] = { ...usage[month], [family]: (usage[month]?.[family] ?? 0) + batch.reduce((n, p) => n + p.text.length, 0) };
+      await writeFile(USAGE, JSON.stringify(usage, null, 2) + "\n");
     }
     // Remove recordings of older versions of the text.
     for (const file of await readdir(dir)) if (!file.startsWith(`${key36}-`)) await rm(path.join(dir, file));
