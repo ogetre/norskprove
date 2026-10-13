@@ -91,6 +91,14 @@ function connectEffects(el: HTMLAudioElement): Sound | null {
 
 const FEMALE_VOICE = /pernille|iselin|nora|hulda|ida|liv|female|kvinne/i;
 const MALE_VOICE = /finn|jon|henrik|magnus|\bmale\b|\bmann\b/i;
+/** Microsoft Edge has natural Norwegian voices (Pernille, Iselin, Finn) that sound far better. */
+const NATURAL_VOICE = /natural|online/i;
+
+/** Only the natural voices when there are any, so a dialogue doesn't mix good and robotic voices. */
+const best = (list: SpeechSynthesisVoice[]) => {
+  const natural = list.filter((v) => NATURAL_VOICE.test(v.name));
+  return natural.length ? natural : list;
+};
 
 type BrowserVoice = { voice: SpeechSynthesisVoice; pitch: number };
 
@@ -99,8 +107,8 @@ type BrowserVoice = { voice: SpeechSynthesisVoice; pitch: number };
  * who have to share a voice get a different pitch, so a dialogue never sounds like one person.
  */
 function browserVoices(task: ListeningTask, cast: Cast, voices: SpeechSynthesisVoice[]) {
-  const female = voices.filter((v) => FEMALE_VOICE.test(v.name));
-  const male = voices.filter((v) => MALE_VOICE.test(v.name) && !FEMALE_VOICE.test(v.name));
+  const female = best(voices.filter((v) => FEMALE_VOICE.test(v.name)));
+  const male = best(voices.filter((v) => MALE_VOICE.test(v.name) && !FEMALE_VOICE.test(v.name)));
   const shared = new Map<string, number>();
   const result: Partial<Record<SpeakerId, BrowserVoice>> = {};
   for (const id of speakerOrder(task)) {
@@ -159,6 +167,7 @@ export function ListeningPlayer({
   const canPlay = recorded || speechReady;
   // Browser voices load asynchronously; only call them missing after a short wait.
   const noVoice = hydrated && waited && !canPlay;
+  const robotic = !recorded && speechReady && !voices.some((v) => NATURAL_VOICE.test(v.name));
   const used = limit && plays >= task.maxPlays;
 
   useEffect(() => {
@@ -339,6 +348,10 @@ export function ListeningPlayer({
             ↺ Hør replikken igjen
           </button>
         </div>
+      )}
+
+      {robotic && (
+        <p className="mt-4 text-xs text-mist">Tips: I Microsoft Edge hører du mer naturlige norske stemmer.</p>
       )}
 
       {noVoice && !transcriptVisible && (
