@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "audio": "tsx scripts/generate-audio.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

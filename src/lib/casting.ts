@@ -44,8 +44,10 @@ function introducedAs(lines: string[]): VoiceGender | undefined {
 
 export type CastVoice = {
   gender: VoiceGender;
-  /** Picks a voice among those of the same type; two speakers in a task never share a number. */
+  /** Picks a voice among those of the same type, so different tasks use different voices. */
   index: number;
+  /** Which speaker of this voice type it is in the task, from 0. */
+  nth: number;
   /** A small personal speed variation on top of the level speed. */
   rate: number;
 };
@@ -70,20 +72,24 @@ export function castVoices(task: ListeningTask): Cast {
     if (g) genders.set(id, g);
   }
   // Unknown speakers get the voice type there are fewest of, so dialogues are easy to follow.
+  // On a tie in a group, a woman's voice: there are more of them to choose from.
   order.forEach((id, i) => {
     if (genders.has(id)) return;
     const women = [...genders.values()].filter((g) => g === "kvinne").length;
     const men = genders.size - women;
-    genders.set(id, women < men ? "kvinne" : men < women ? "mann" : (seed + i) % 2 ? "kvinne" : "mann");
+    const tie = genders.size ? "kvinne" : (seed + i) % 2 ? "kvinne" : "mann";
+    genders.set(id, women < men ? "kvinne" : men < women ? "mann" : tie);
   });
 
   const cast: Cast = {};
   const used = { kvinne: 0, mann: 0 };
   for (const id of order) {
     const gender = genders.get(id)!;
+    const nth = used[gender]++;
     cast[id] = {
       gender,
-      index: (seed >>> 3) + used[gender]++,
+      index: (seed >>> 3) + nth,
+      nth,
       rate: 1 + (((hash(task.id + id) % 7) - 3) * 0.015),
     };
   }
