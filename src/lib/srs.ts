@@ -1,5 +1,5 @@
 import { dayKey } from "./store";
-import type { SavedWord, SrsState } from "./types";
+import type { SrsState } from "./types";
 
 /*
  * Spaced repetition for saved words, a simplified SM-2: each answer sets how many days
@@ -55,8 +55,8 @@ export function inDays(n: number): string {
 /** New words a day can bring into the review, so a long list doesn't swamp it. */
 const NEW_PER_SESSION = 10;
 
-/** Words to review now: those due, oldest first, then a few never reviewed. */
-export function reviewQueue(words: SavedWord[], srs: Record<string, SrsState>, today = dayKey()): SavedWord[] {
+/** Cards to review now: those due, oldest first, then a few never reviewed. Lists are newest first. */
+export function reviewQueue<T extends { id: string }>(words: T[], srs: Record<string, SrsState>, today = dayKey()): T[] {
   const due = words
     .filter((w) => srs[w.id] && srs[w.id].due <= today)
     .sort((a, b) => srs[a.id].due.localeCompare(srs[b.id].due));

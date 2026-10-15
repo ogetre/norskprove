@@ -33,6 +33,11 @@ export function isRtl(code: LanguageCode): boolean {
   return "rtl" in info && info.rtl;
 }
 
+/** lang and dir for text written in a learner's language; Norwegian when there is none. */
+export function textLang(lang: string | undefined) {
+  return isLanguage(lang) ? { lang, dir: isRtl(lang) ? ("rtl" as const) : ("ltr" as const) } : { lang: "nb" };
+}
+
 /** The first of the browser's languages we support, or English. */
 export function browserLanguage(): LanguageCode {
   if (typeof navigator === "undefined") return "en";

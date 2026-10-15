@@ -6,12 +6,13 @@ import { useAccess } from "@/components/Access";
 import type { WritingTask } from "@/content/writing";
 import { locateErrors, type LocatedError } from "@/lib/error-spans";
 import { FEEDBACK_LEVELS, topicName, type FeedbackLevel } from "@/lib/feedback-topics";
+import { textLang } from "@/lib/languages";
 import { useNativeLanguage } from "@/lib/native-language";
 import { planHasAiFeedback } from "@/lib/plans";
 import { attachWritingFeedback, useAppState } from "@/lib/store";
 import type { WritingFeedback } from "@/lib/types";
 import { countWords } from "@/lib/writing-checks";
-import { FixYourself, textLang } from "./FixYourself";
+import { FixYourself } from "./FixYourself";
 
 class RequestError extends Error {
   constructor(
@@ -456,6 +457,12 @@ function ErrorsSection({
           </li>
         ))}
       </ol>
+      <p className="mt-5 text-sm text-granite">
+        Feilene blir til øvelser du kan repetere.{" "}
+        <Link href="/trening/feil" className="font-medium text-fjord underline-offset-4 hover:underline">
+          Øv på feilene dine
+        </Link>
+      </p>
     </section>
   );
 }
