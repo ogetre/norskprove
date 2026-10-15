@@ -73,8 +73,13 @@ export interface ReadingTask {
   questions: Question[];
 }
 
+export type SpeakerId = "A" | "B" | "C" | "D" | "E";
+
+/** Voice type for a speaker; most speakers get theirs from their name, see casting. */
+export type VoiceGender = "kvinne" | "mann";
+
 export interface ListeningLine {
-  speaker: "A" | "B";
+  speaker: SpeakerId;
   text: string;
 }
 
@@ -84,8 +89,10 @@ export interface ListeningTask {
   title: string;
   genre: string;
   situation: string;
-  /** Names shown in the transcript, e.g. { A: "Kari", B: "Ahmed" } */
-  speakers: Record<"A" | "B", string>;
+  /** Names shown in the transcript, e.g. { A: "Kari", B: "Ahmed" }. A monologue only needs A. */
+  speakers: { A: string } & Partial<Record<SpeakerId, string>>;
+  /** Voice type when the name or role doesn't give it, e.g. { B: "kvinne" } for «Økonom». */
+  voices?: Partial<Record<SpeakerId, VoiceGender>>;
   lines: ListeningLine[];
   maxPlays: number;
   glossary: Glossary;

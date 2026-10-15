@@ -205,6 +205,7 @@ export const listeningB2: ListeningTask[] = [
     genre: "Nyhetsinnslag",
     situation: "Du hører et nyhetsinnslag om renta.",
     speakers: { A: "Nyhetsoppleser", B: "Økonom" },
+    voices: { B: "kvinne" },
     maxPlays: 2,
     lines: [
       { speaker: "A", text: "Norges Bank satte i dag opp styringsrenten med et kvart prosentpoeng. Sentralbanken begrunner beslutningen med at prisveksten fortsatt er for høy. Vi har med oss sjeføkonom Hilde Wang. Hva betyr dette for folk flest?" },
@@ -880,6 +881,7 @@ export const listeningB2: ListeningTask[] = [
     genre: "Nyhetsinnslag",
     situation: "Du hører et nyhetsinnslag om telefonsvindel.",
     speakers: { A: "Nyhetsoppleser", B: "Politi" },
+    voices: { B: "mann" },
     maxPlays: 2,
     lines: [
       { speaker: "A", text: "Politiet melder om en kraftig økning i svindelforsøk mot eldre. Svindlerne ringer og utgir seg for å være fra banken eller politiet. De sier at kontoen er utsatt for angrep, og at pengene må flyttes til en «sikker konto». Vi har med oss politioverbetjent Rune Dahl." },
@@ -1363,15 +1365,15 @@ export const listeningB2: ListeningTask[] = [
     title: "Kunstig intelligens på arbeidsplassen",
     genre: "Paneldebatt",
     situation: "Tre personer diskuterer hvordan kunstig intelligens påvirker arbeidslivet.",
-    speakers: { A: "Ordstyrer", B: "Paneldeltakere" },
+    speakers: { A: "Ordstyrer", B: "Kristoffer", C: "Marianne", D: "Olav" },
     maxPlays: 2,
     lines: [
-      { speaker: "A", text: "Hvordan vil kunstig intelligens endre arbeidslivet? Først du, Kristoffer." },
-      { speaker: "B", text: "Kristoffer, teknologidirektør: Jeg tror vi vil se store gevinster. Rutineoppgaver som å skrive referater og sortere e-post kan automatiseres, og da får de ansatte mer tid til det som virkelig krever menneskelig vurdering." },
-      { speaker: "A", text: "Marianne, du representerer de ansatte." },
-      { speaker: "B", text: "Marianne, forbundsleder: Gevinstene er reelle, men vi må sikre at de ansatte er med på å bestemme hvordan teknologien tas i bruk. Ellers risikerer vi overvåking og at folk mister jobben uten å få mulighet til omskolering." },
-      { speaker: "A", text: "Og Olav, du forsker på dette." },
-      { speaker: "B", text: "Olav, forsker: Historisk har ny teknologi skapt flere jobber enn den har fjernet. Men overgangen kan være smertefull for enkeltpersoner. Det avgjørende blir om vi investerer nok i etter- og videreutdanning." },
+      { speaker: "A", text: "Hvordan vil kunstig intelligens endre arbeidslivet? Først du, Kristoffer, som er teknologidirektør." },
+      { speaker: "B", text: "Jeg tror vi vil se store gevinster. Rutineoppgaver som å skrive referater og sortere e-post kan automatiseres, og da får de ansatte mer tid til det som virkelig krever menneskelig vurdering." },
+      { speaker: "A", text: "Marianne, du er forbundsleder og representerer de ansatte." },
+      { speaker: "C", text: "Gevinstene er reelle, men vi må sikre at de ansatte er med på å bestemme hvordan teknologien tas i bruk. Ellers risikerer vi overvåking og at folk mister jobben uten å få mulighet til omskolering." },
+      { speaker: "A", text: "Og Olav, du er forsker og har studert dette i mange år." },
+      { speaker: "D", text: "Historisk har ny teknologi skapt flere jobber enn den har fjernet. Men overgangen kan være smertefull for enkeltpersoner. Det avgjørende blir om vi investerer nok i etter- og videreutdanning." },
     ],
     glossary: [
       ["gevinster", "fordeler, det man tjener på noe"],
