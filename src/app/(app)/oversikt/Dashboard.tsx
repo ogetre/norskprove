@@ -9,6 +9,7 @@ import { daysUntil, estimateLevel, levelIndex } from "@/lib/levels";
 import { dayKey, resetProgress, streak, useAppState, useHydrated } from "@/lib/store";
 import { LEVELS, SKILL_NAMES, type AppState, type Level, type Skill } from "@/lib/types";
 import { Onboarding } from "./Onboarding";
+import { Readiness } from "./Readiness";
 
 type ReadingRef = { id: string; title: string; level: Level };
 
@@ -172,6 +173,12 @@ export function Dashboard({
       {(!profile.onboarded || editing) && (
         <div className="mt-8">
           <Onboarding profile={profile} editing={editing} onDone={() => setEditing(false)} />
+        </div>
+      )}
+
+      {profile.onboarded && !editing && (
+        <div className="mt-8">
+          <Readiness state={state} target={profile.targetLevel ?? "B1"} />
         </div>
       )}
 
