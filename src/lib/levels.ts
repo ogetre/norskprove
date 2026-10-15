@@ -5,17 +5,22 @@ export function levelIndex(l: Level): number {
 }
 
 /**
- * Estimated level for a skill: the highest level where recent practice is at
- * least 70% correct over 3+ tasks, never below the level-test result.
+ * Estimated level for a skill. The latest full test is the main signal; practice
+ * can raise it (3+ recent tasks at a level with at least 70% correct). A trial
+ * result is used only when there is nothing else.
  */
 export function estimateLevel(state: AppState, skill: Skill): Level | undefined {
-  const fromTest = state.testLevels[skill];
-  let best = fromTest ? levelIndex(fromTest) : -1;
+  const own = state.attempts.filter((a) => a.skill === skill);
+  const lastResult = (mode: "full" | "trial") => [...own].reverse().find((a) => a.mode === mode && a.result)?.result;
+  const asIndex = (r: Level | "under A1" | undefined) => (r && r !== "under A1" ? levelIndex(r) : -1);
 
+  const fromTest = state.testLevels[skill];
+  let best = Math.max(fromTest ? levelIndex(fromTest) : -1, asIndex(lastResult("full")));
+
+  // Full tests and trials store their result as the level, so they are not practice.
+  const practice = own.filter((a) => a.mode !== "full" && a.mode !== "trial");
   for (const level of LEVELS) {
-    const recent = state.attempts
-      .filter((a) => a.skill === skill && a.level === level)
-      .slice(-6);
+    const recent = practice.filter((a) => a.level === level).slice(-6);
     if (recent.length < 3) continue;
     const correct = recent.reduce((n, a) => n + a.correct, 0);
     const total = recent.reduce((n, a) => n + a.total, 0);
@@ -32,6 +37,7 @@ export function estimateLevel(state: AppState, skill: Skill): Level | undefined 
     }
   }
 
+  if (best < 0) best = asIndex(lastResult("trial"));
   return best >= 0 ? LEVELS[best] : undefined;
 }
 

@@ -185,11 +185,13 @@ export interface WritingFeedback {
   summary: string;
   criteria: { name: string; level: string; comment: string }[];
   errors: {
+    /** The wrong words, copied exactly from the text. */
     original: string;
     correction: string;
     explanation: string;
     topic: string;
   }[];
+  strengths: string[];
   improved_text: string;
   tips: string[];
 }

@@ -47,6 +47,7 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
   const [now, setNow] = useState(0);
   const [confirm, setConfirm] = useState(false);
   const [results, setResults] = useState<Check[][]>([]);
+  const [submissionIds, setSubmissionIds] = useState<string[]>([]);
   const [view, setView] = useState(0);
   const done = useRef(false);
 
@@ -64,12 +65,13 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
     done.current = true;
     clearUnfinished("skriving");
     const all = band.tasks.map((task, i) => checkWriting(task, texts[i]));
-    band.tasks.forEach((task, i) => {
+    const ids = band.tasks.map((task, i) => {
       const passed = all[i].filter((c) => c.ok).length;
       recordAttempt({ skill: "skriving", taskId: task.id, level: task.level, correct: passed, total: all[i].length, mode: "full" });
-      addWriting({ promptId: task.id, text: texts[i], words: countWords(texts[i]) });
+      return addWriting({ promptId: task.id, text: texts[i], words: countWords(texts[i]) });
     });
     setResults(all);
+    setSubmissionIds(ids);
     setConfirm(false);
     setPhase("result");
     window.scrollTo({ top: 0 });
@@ -197,7 +199,13 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
             </button>
           ))}
         </div>
-        <WritingFeedback key={view} task={band.tasks[view]} text={texts[view]} checks={results[view]} />
+        <WritingFeedback
+          key={view}
+          task={band.tasks[view]}
+          text={texts[view]}
+          checks={results[view]}
+          submissionId={submissionIds[view]}
+        />
         <Link href="/trening/skriving" className="inline-flex rounded-md px-5 py-2.5 font-medium text-granite ring-1 ring-ice hover:text-ink">
           Tilbake til skriving
         </Link>

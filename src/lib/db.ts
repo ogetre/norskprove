@@ -9,7 +9,7 @@ export function sql() {
 
 let schemaReady: Promise<void> | null = null;
 
-/** Creates the progress table on first use; retried if it fails. */
+/** Creates the tables on first use; retried if it fails. */
 export function ensureSchema(): Promise<void> {
   const db = sql();
   schemaReady ??= Promise.all([
@@ -29,6 +29,15 @@ export function ensureSchema(): Promise<void> {
         stripe_customer_id     text,
         stripe_subscription_id text,
         updated_at             timestamptz NOT NULL DEFAULT now()
+      )`,
+    db`
+      CREATE TABLE IF NOT EXISTS ai_usage (
+        user_id       text NOT NULL,
+        day           date NOT NULL,
+        requests      integer NOT NULL DEFAULT 0,
+        input_tokens  bigint NOT NULL DEFAULT 0,
+        output_tokens bigint NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, day)
       )`,
   ])
     .then(() => undefined)
