@@ -4,6 +4,7 @@ import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { SkillIcon, SKILLS } from "@/components/SkillIcon";
 import { estimateLevel } from "@/lib/levels";
+import { reviewQueue } from "@/lib/srs";
 import { useAppState, useHydrated } from "@/lib/store";
 import { SKILL_NAMES } from "@/lib/types";
 
@@ -15,6 +16,7 @@ function Name() {
 export function Hub({ authEnabled }: { authEnabled: boolean }) {
   const state = useAppState();
   const hydrated = useHydrated();
+  const due = hydrated ? reviewQueue(state.words ?? [], state.srs).length : 0;
 
   return (
     <>
@@ -63,8 +65,31 @@ export function Hub({ authEnabled }: { authEnabled: boolean }) {
       </ul>
 
       <Link
+        href="/trening/ord"
+        className="mt-6 flex items-center justify-between gap-4 rounded-2xl bg-surface px-6 py-5 ring-1 ring-ice transition-colors hover:bg-ice/50"
+      >
+        <span>
+          <span className="block font-semibold">Mine ord</span>
+          <span className="text-sm text-granite">
+            {!hydrated || !state.words?.length
+              ? "Lagre ord fra tekstene og repeter dem litt hver dag"
+              : `${state.words.length} ord lagret`}
+          </span>
+        </span>
+        {due > 0 ? (
+          <span className="shrink-0 rounded-full bg-rorbu px-3 py-1 text-sm font-semibold text-white tabular-nums">
+            {due} i dag
+          </span>
+        ) : (
+          <span aria-hidden="true" className="text-2xl text-granite">
+            ›
+          </span>
+        )}
+      </Link>
+
+      <Link
         href="/oversikt"
-        className="mt-6 flex items-center justify-between rounded-2xl bg-fjord-deep px-6 py-5 text-snow transition-colors hover:bg-[#13344a]"
+        className="mt-3 flex items-center justify-between rounded-2xl bg-fjord-deep px-6 py-5 text-snow transition-colors hover:bg-[#13344a]"
       >
         <span>
           <span className="block font-semibold">Min fremgang</span>

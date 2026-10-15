@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { browserLanguage, isLanguage, LANGUAGES, type LanguageCode } from "@/lib/languages";
 import { saveProfile } from "@/lib/store";
 import type { ExamGoal, Level, Profile } from "@/lib/types";
 
@@ -26,6 +27,9 @@ export function Onboarding({
   const [goal, setGoal] = useState<ExamGoal | undefined>(profile.goal);
   const [examDate, setExamDate] = useState(profile.examDate ?? "");
   const [target, setTarget] = useState<Level>(profile.targetLevel ?? "B1");
+  const [lang, setLang] = useState<LanguageCode>(() =>
+    isLanguage(profile.nativeLanguage) ? profile.nativeLanguage : browserLanguage(),
+  );
 
   const chip =
     "rounded-full border border-ice bg-surface px-4 py-2 text-sm transition-colors hover:border-mist aria-pressed:border-ink aria-pressed:bg-ink aria-pressed:text-snow";
@@ -35,7 +39,7 @@ export function Onboarding({
       className="rounded-2xl bg-surface p-6 ring-1 ring-ice sm:p-8"
       onSubmit={(e) => {
         e.preventDefault();
-        saveProfile({ goal, examDate: examDate || undefined, targetLevel: target, onboarded: true });
+        saveProfile({ goal, examDate: examDate || undefined, targetLevel: target, nativeLanguage: lang, onboarded: true });
         onDone?.();
       }}
     >
@@ -78,6 +82,22 @@ export function Onboarding({
           <span className="mt-1 block text-sm text-granite">Du kan la feltet stå tomt hvis du ikke vet ennå.</span>
         </label>
       </div>
+
+      <label className="mt-6 block max-w-sm">
+        <span className="font-semibold">Hvilket språk vil du ha oversettelser på?</span>
+        <select
+          value={lang}
+          onChange={(e) => setLang(e.target.value as LanguageCode)}
+          className="mt-3 block w-full rounded-lg border border-ice bg-surface px-3 py-2 focus:border-fjord focus:outline-none"
+        >
+          {LANGUAGES.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-sm text-granite">Brukes når du slår opp ord og oversetter tekster.</span>
+      </label>
 
       <div className="mt-8 flex gap-3">
         <button

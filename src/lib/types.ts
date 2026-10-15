@@ -238,6 +238,32 @@ export interface Profile {
   goal?: ExamGoal;
   examDate?: string;
   targetLevel?: Level;
+  /** Language code for translations and explanations, see lib/languages. */
+  nativeLanguage?: string;
+}
+
+/** A dictionary entry for a word in a text, from AI. */
+export interface WordEntry {
+  lemma: string;
+  pos: string;
+  gender: string;
+  translation: string;
+  meaning_no: string;
+  forms: { label: string; value: string }[];
+  example: string;
+  example_translation: string;
+  note: string;
+}
+
+/** A word the learner saved to practise. */
+export interface SavedWord extends WordEntry {
+  /** Lemma and part of speech, so the same word is saved once. */
+  id: string;
+  /** The word as it stood in the text. */
+  word: string;
+  lang: string;
+  taskId: string;
+  at: string;
 }
 
 export interface AppState {
@@ -248,6 +274,8 @@ export interface AppState {
   writing: WritingSubmission[];
   speaking: SpeakingSubmission[];
   srs: Record<string, SrsState>;
+  /** Saved words, newest first; missing in progress saved before words existed. */
+  words?: SavedWord[];
   grammarErrors: Record<string, number>;
   xp: number;
   activeDays: string[];

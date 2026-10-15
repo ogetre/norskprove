@@ -3,6 +3,7 @@
 import { isListening, type ExamTask } from "@/lib/types";
 import { ListeningPlayer } from "./ListeningPlayer";
 import { ReadingText } from "./ReadingText";
+import { WordLookupProvider } from "./words/WordLookup";
 
 /** The text to read or the recording to hear for a task. */
 export function Stimulus({
@@ -18,7 +19,7 @@ export function Stimulus({
   onPlay?: () => void;
 }) {
   if (isListening(task)) {
-    return (
+    const player = (
       <ListeningPlayer
         key={task.id}
         task={task}
@@ -28,6 +29,8 @@ export function Stimulus({
         showTranscript={mode === "review"}
       />
     );
+    // The word card sits outside the dark player, so it follows the page's theme.
+    return mode === "exam" ? player : <WordLookupProvider>{player}</WordLookupProvider>;
   }
-  return <ReadingText task={task} compact={mode === "review"} />;
+  return <ReadingText task={task} compact={mode === "review"} interactive={mode !== "exam"} />;
 }

@@ -1,13 +1,10 @@
 import "server-only";
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { WRITING_KIND_NAMES, type WritingTask } from "@/content/writing";
 import { ERROR_TOPIC_IDS, FEEDBACK_LEVELS, WRITING_CRITERIA } from "./feedback-topics";
+import { askJson } from "./claude";
 import type { WritingFeedback } from "./types";
 import { countWords } from "./writing-checks";
-
-/** The cheapest current Claude model; good enough for marking short texts. */
-const MODEL = "claude-haiku-5-5";
 
 const Level = z.enum(FEEDBACK_LEVELS);
 
@@ -31,11 +28,6 @@ const FeedbackSchema = z.object({
   tips: z.array(z.string()),
   improved_text: z.string(),
 });
-
-// Sent as is: the SDK's zod helper turns `enum` into a description, and the API should
-// enforce the topics, criteria and levels.
-const FEEDBACK_JSON_SCHEMA: Record<string, unknown> = z.toJSONSchema(FeedbackSchema);
-delete FEEDBACK_JSON_SCHEMA.$schema;
 
 const SYSTEM = `You are an experienced examiner (sensor) for Norskprøven, the Norwegian test for adult immigrants, and a friendly writing teacher. You assess a candidate's written answer and give feedback that helps them learn.
 
@@ -91,44 +83,20 @@ function taskPrompt(task: WritingTask, raw: string): string {
   ].join("\n");
 }
 
-/** Claude declined to assess the text. */
-export class FeedbackRefused extends Error {}
-
-function feedbackRequest(task: WritingTask, text: string): Anthropic.MessageCreateParamsNonStreaming {
-  return {
-    model: MODEL,
-    // A check writes about 5500 tokens; the cap bounds what one request can cost.
-    max_tokens: 12000,
-    system: SYSTEM,
-    messages: [{ role: "user", content: taskPrompt(task, text) }],
-    // "high" found every error in our sample texts; "medium" missed some spelling.
-    output_config: { effort: "high", format: { type: "json_schema", schema: FEEDBACK_JSON_SCHEMA } },
-  };
-}
-
-/** USD per token for Claude Haiku 5.5 (prompts up to 100K tokens). */
-export const PRICE_PER_TOKEN = { input: 0.0000001, output: 0.0000005 };
-
-let client: Anthropic | null = null;
-
 /** Asks Claude for feedback. `onUsage` gets the billed tokens, also when the answer turns out unusable. */
 export async function assessWriting(
   task: WritingTask,
   text: string,
   onUsage: (input: number, output: number) => Promise<void>,
 ): Promise<WritingFeedback> {
-  client ??= new Anthropic({ timeout: 75_000, maxRetries: 1 });
-  const response = await client.messages.create(feedbackRequest(task, text));
-  await onUsage(response.usage.input_tokens, response.usage.output_tokens);
-  return readFeedback(response);
-}
-
-function readFeedback(response: Anthropic.Message): WritingFeedback {
-  if (response.stop_reason === "refusal") throw new FeedbackRefused();
-  const json = response.content.find((b) => b.type === "text")?.text;
-  if (!json || response.stop_reason !== "end_turn") {
-    throw new Error(`No complete feedback in the response (stop_reason ${response.stop_reason})`);
-  }
-  const parsed = FeedbackSchema.parse(JSON.parse(json));
+  const parsed = await askJson(FeedbackSchema, {
+    system: SYSTEM,
+    prompt: taskPrompt(task, text),
+    // "high" found every error in our sample texts; "medium" missed some spelling.
+    effort: "high",
+    // A check writes about 5500 tokens; the cap bounds what one request can cost.
+    maxTokens: 12000,
+    onUsage,
+  });
   return { ...parsed, errors: parsed.errors.filter((e) => e.original.trim() && e.original !== e.correction) };
 }
