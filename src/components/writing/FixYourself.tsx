@@ -4,15 +4,10 @@ import { useState } from "react";
 import type { WritingTask } from "@/content/writing";
 import type { LocatedError } from "@/lib/error-spans";
 import { topicName } from "@/lib/feedback-topics";
-import { isLanguage, isRtl } from "@/lib/languages";
+import { textLang } from "@/lib/languages";
 import { useNativeLanguage } from "@/lib/native-language";
 import { saveRevision, useAppState } from "@/lib/store";
 import type { WritingRecheck } from "@/lib/types";
-
-/** lang and dir for text written in the feedback's language. */
-export function textLang(lang: string | undefined) {
-  return isLanguage(lang) ? { lang, dir: isRtl(lang) ? ("rtl" as const) : ("ltr" as const) } : { lang: "nb" };
-}
 
 /**
  * The learner corrects the marked errors in their own text, with the corrections hidden,

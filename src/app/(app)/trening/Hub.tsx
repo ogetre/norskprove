@@ -3,6 +3,7 @@
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { SkillIcon, SKILLS } from "@/components/SkillIcon";
+import { collectDrills } from "@/lib/error-drills";
 import { estimateLevel } from "@/lib/levels";
 import { reviewQueue } from "@/lib/srs";
 import { useAppState, useHydrated } from "@/lib/store";
@@ -13,10 +14,22 @@ function Name() {
   return user?.firstName ? <>, {user.firstName}</> : null;
 }
 
+function DueBadge({ n }: { n: number }) {
+  return n > 0 ? (
+    <span className="shrink-0 rounded-full bg-rorbu px-3 py-1 text-sm font-semibold text-white tabular-nums">{n} i dag</span>
+  ) : (
+    <span aria-hidden="true" className="text-2xl text-granite">
+      ›
+    </span>
+  );
+}
+
 export function Hub({ authEnabled }: { authEnabled: boolean }) {
   const state = useAppState();
   const hydrated = useHydrated();
   const due = hydrated ? reviewQueue(state.words ?? [], state.srs).length : 0;
+  const drills = hydrated ? collectDrills(state) : [];
+  const drillsDue = hydrated ? reviewQueue(drills, state.srs).length : 0;
 
   return (
     <>
@@ -76,15 +89,22 @@ export function Hub({ authEnabled }: { authEnabled: boolean }) {
               : `${state.words.length} ord lagret`}
           </span>
         </span>
-        {due > 0 ? (
-          <span className="shrink-0 rounded-full bg-rorbu px-3 py-1 text-sm font-semibold text-white tabular-nums">
-            {due} i dag
+        <DueBadge n={due} />
+      </Link>
+
+      <Link
+        href="/trening/feil"
+        className="mt-3 flex items-center justify-between gap-4 rounded-2xl bg-surface px-6 py-5 ring-1 ring-ice transition-colors hover:bg-ice/50"
+      >
+        <span>
+          <span className="block font-semibold">Øv på feilene dine</span>
+          <span className="text-sm text-granite">
+            {drills.length
+              ? `${drills.length} feil fra tekstene dine`
+              : "Feilene i tekstene dine blir til øvelser"}
           </span>
-        ) : (
-          <span aria-hidden="true" className="text-2xl text-granite">
-            ›
-          </span>
-        )}
+        </span>
+        <DueBadge n={drillsDue} />
       </Link>
 
       <Link
