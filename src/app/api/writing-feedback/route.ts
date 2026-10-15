@@ -1,23 +1,30 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { getWritingTask } from "@/content/writing";
+import { releaseCheck, recordTokens, reserveCheck, USER_DAILY_LIMIT } from "@/lib/ai-usage";
 import { authEnabled } from "@/lib/auth-config";
-import { ensureSchema, sql } from "@/lib/db";
 import { planHasAiFeedback } from "@/lib/plans";
 import { activePlan } from "@/lib/subscription";
 import { assessWriting, FeedbackRefused } from "@/lib/writing-ai";
 import { countWords } from "@/lib/writing-checks";
 
-export const maxDuration = 120;
+// Claude takes 15–30 s; one retry after a timeout has to fit too.
+export const maxDuration = 160;
 
-/** AI checks per user per day; each costs well under a cent. */
-const DAILY_LIMIT = 30;
-const MAX_CHARS = 6000;
+const MAX_CHARS = 4000;
 // Locally the feature can be tried without signing in or a Premium plan.
 const isDev = process.env.NODE_ENV === "development";
 
 function fail(error: string, status: number) {
   return Response.json({ error }, { status });
+}
+
+/**
+ * True when Claude returned no answer, so nothing was billed. A timeout may still have
+ * been billed; a refusal or an unusable answer was.
+ */
+function notBilled(err: unknown): boolean {
+  return err instanceof Anthropic.APIError && !(err instanceof Anthropic.APIConnectionTimeoutError);
 }
 
 /** AI feedback on a written answer: errors with corrections, criteria and an estimated level. */
@@ -39,37 +46,31 @@ export async function POST(req: Request) {
   const task = typeof body.taskId === "string" ? getWritingTask(body.taskId) : undefined;
   if (!task) return fail("Fant ikke oppgaven.", 400);
   const text = typeof body.text === "string" ? body.text.trim() : "";
-  if (countWords(text) < 5) return fail("Teksten er for kort til å vurderes.", 400);
-  if (text.length > MAX_CHARS) return fail("Teksten er for lang til å vurderes.", 413);
+  const words = countWords(text);
+  if (words < 5) return fail("Teksten er for kort til å vurderes.", 400);
+  if (text.length > MAX_CHARS || words > task.maxWords * 2) {
+    return fail(`Teksten er for lang til å vurderes. Hold deg under ${task.maxWords * 2} ord.`, 413);
+  }
 
   if (userId) {
-    await ensureSchema();
-    const used = await sql()`
-      INSERT INTO ai_usage (user_id, day, requests) VALUES (${userId}, current_date, 1)
-      ON CONFLICT (user_id, day) DO UPDATE SET requests = ai_usage.requests + 1
-      WHERE ai_usage.requests < ${DAILY_LIMIT}
-      RETURNING requests`;
-    if (used.length === 0) {
-      return fail(`Du har brukt alle ${DAILY_LIMIT} AI-tilbakemeldingene for i dag. Prøv igjen i morgen.`, 429);
+    const reserved = await reserveCheck(userId);
+    if (reserved === "user-limit") {
+      return fail(`Du har brukt alle ${USER_DAILY_LIMIT} AI-tilbakemeldingene for i dag. Prøv igjen i morgen.`, 429);
+    }
+    if (reserved === "site-limit") {
+      return fail("AI-tilbakemelding er stengt resten av dagen. Prøv igjen i morgen.", 503);
     }
   }
 
   try {
-    const { feedback, usage } = await assessWriting(task, text);
-    if (userId) {
-      await sql()`
-        UPDATE ai_usage
-        SET input_tokens = input_tokens + ${usage.input}, output_tokens = output_tokens + ${usage.output}
-        WHERE user_id = ${userId} AND day = current_date`;
-    }
+    const feedback = await assessWriting(task, text, async (input, output) => {
+      // The answer is paid for, so a failed write must not cost the user their feedback.
+      if (userId) await recordTokens(userId, input, output).catch((e) => console.error("ai_usage update failed", e));
+    });
     return Response.json({ feedback });
   } catch (err) {
-    // A failed check does not count towards the daily limit.
-    if (userId) {
-      await sql()`
-        UPDATE ai_usage SET requests = GREATEST(requests - 1, 0)
-        WHERE user_id = ${userId} AND day = current_date`.catch(() => undefined);
-    }
+    // Only a check that cost nothing is given back; otherwise failing answers could be repeated for free.
+    if (userId && notBilled(err)) await releaseCheck(userId).catch(() => undefined);
     if (err instanceof FeedbackRefused) {
       return fail("AI-sensoren kunne ikke vurdere denne teksten. Endre teksten litt og prøv igjen.", 422);
     }
@@ -81,9 +82,8 @@ export async function POST(req: Request) {
       return fail("AI-sensoren er opptatt akkurat nå. Prøv igjen om litt.", 503);
     }
     console.error("writing-feedback failed", err);
-    if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-      return fail("AI-tilbakemelding er ikke satt opp riktig.", 503);
-    }
+    // Also an empty credit balance or a revoked key.
+    if (err instanceof Anthropic.APIError) return fail("AI-tilbakemelding er midlertidig utilgjengelig.", 503);
     return fail("Noe gikk galt med AI-tilbakemeldingen. Prøv igjen.", 502);
   }
 }
