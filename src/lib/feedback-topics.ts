@@ -30,5 +30,8 @@ export const WRITING_CRITERIA = [
   "Rettskriving og tegnsetting",
 ] as const;
 
+/** What the AI assesses spoken answers on. Pronunciation is left out: it only gets a transcript. */
+export const SPEAKING_CRITERIA = ["Oppgaveløsning", "Sammenheng og flyt", "Ordforråd", "Grammatikk"] as const;
+
 export const FEEDBACK_LEVELS = ["A1", "A2", "B1", "B2", "C1"] as const;
 export type FeedbackLevel = (typeof FEEDBACK_LEVELS)[number];

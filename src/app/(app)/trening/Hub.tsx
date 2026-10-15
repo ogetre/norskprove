@@ -100,8 +100,8 @@ export function Hub({ authEnabled }: { authEnabled: boolean }) {
           <span className="block font-semibold">Øv på feilene dine</span>
           <span className="text-sm text-granite">
             {drills.length
-              ? `${drills.length} feil fra tekstene dine`
-              : "Feilene i tekstene dine blir til øvelser"}
+              ? `${drills.length} feil fra oppgavene dine`
+              : "Feilene dine blir til øvelser"}
           </span>
         </span>
         <DueBadge n={drillsDue} />

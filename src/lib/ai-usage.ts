@@ -11,7 +11,7 @@ import { ensureSchema, sql } from "./db";
  * (writing feedback) or "_total:<kind>" for the whole site.
  */
 
-export type AiKind = "feedback" | "recheck" | "lookup" | "translate";
+export type AiKind = "feedback" | "recheck" | "speaking" | "followup" | "lookup" | "translate";
 
 const TOTAL = "_total";
 
@@ -23,6 +23,9 @@ function envNumber(name: string, fallback: number): number {
 const LIMITS: Record<AiKind, { user: number; site: () => number }> = {
   feedback: { user: 30, site: () => Math.floor(envNumber("AI_DAILY_REQUESTS", 300)) },
   recheck: { user: 30, site: () => 300 },
+  speaking: { user: 30, site: () => 300 },
+  // One short question per answer in a conversation with the AI examiner.
+  followup: { user: 200, site: () => 3000 },
   // Answers are cached for everyone, so most taps cost nothing.
   lookup: { user: 300, site: () => 5000 },
   translate: { user: 100, site: () => 2000 },

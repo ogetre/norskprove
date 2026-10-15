@@ -1,18 +1,45 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useAccess } from "@/components/Access";
 import { SPEAKING_KIND_NAMES, type SpeakingTask } from "@/content/speaking";
+import { planHasAiFeedback } from "@/lib/plans";
 import { useRecorder } from "@/lib/recorder";
-import { checkAnswer, type Answer } from "@/lib/speaking-checks";
+import { checkAnswer, scriptedCount as scripted, type Answer } from "@/lib/speaking-checks";
 import { addSpeaking, recordAttempt, useHydrated } from "@/lib/store";
 import { speak, stopSpeaking, useNorwegianVoices } from "@/lib/tts";
-import type { Level, Mode } from "@/lib/types";
-import type { Check } from "@/lib/writing-checks";
+import type { Level, Mode, SpeakingTurn } from "@/lib/types";
+import { countWords, type Check } from "@/lib/writing-checks";
 import { clock } from "../writing/WritingPractice";
+import { SpeakingAiFeedback } from "./SpeakingAiFeedback";
 
 const RATE: Record<Level, number> = { A1: 0.85, A2: 0.9, B1: 0.95, B2: 1 };
 
-type Phase = "overview" | "ask" | "record" | "result";
+type Phase = "overview" | "ask" | "think" | "record" | "result";
+
+const toTurns = (row: Answer[]): SpeakingTurn[] =>
+  row.map((a) => ({ question: a.question, answer: a.transcript, ...(a.followUp ? { followUp: true } : {}) }));
+
+/** The AI examiner's follow-up to the last answer, or null when there is none in time. */
+async function fetchFollowUp(taskId: string, row: Answer[]): Promise<string | null> {
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 20_000);
+  try {
+    const res = await fetch("/api/speaking-followup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId, turns: toTurns(row).map(({ question, answer }) => ({ question, answer })) }),
+      signal: abort.signal,
+    });
+    const data = (await res.json().catch(() => null)) as { question?: string } | null;
+    return res.ok && data?.question ? data.question : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /** Answers so far in a full oral test, saved so it can be continued from the next question. */
 export type SessionProgress = { answers: Answer[][]; typedMode: boolean };
@@ -83,7 +110,7 @@ function TaskResult({ task, answers, checks }: { task: SpeakingTask; answers: An
         {answers.map((a, i) => (
           <li key={i} className="rounded-xl bg-snow p-4 sm:p-5">
             <p className="font-medium">
-              <span className="text-granite">Sensoren: </span>
+              <span className="text-granite">{a.followUp ? "Sensoren følger opp: " : "Sensoren: "}</span>
               {a.question}
             </p>
             {a.url && <audio controls src={a.url} className="mt-3 w-full" />}
@@ -163,9 +190,16 @@ type SessionProps = {
 function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, onFinish }: SessionProps) {
   const voices = useNorwegianVoices();
   const rec = useRecorder();
+  const { plan, loading, dev } = useAccess();
+  const aiAllowed = dev || planHasAiFeedback(plan);
+  const [followUps, setFollowUps] = useState(true);
+  const ai = aiAllowed && followUps;
   const [answers, setAnswers] = useState<Answer[][]>(() => resume?.answers ?? tasks.map(() => []));
-  const [ti, setTi] = useState(() => Math.max(0, answers.findIndex((row, i) => row.length < tasks[i].questions.length)));
-  const [qi, setQi] = useState(() => answers[ti].length);
+  const [ti, setTi] = useState(() => Math.max(0, answers.findIndex((row, i) => scripted(row) < tasks[i].questions.length)));
+  const [qi, setQi] = useState(() => scripted(answers[ti]));
+  /** The follow-up being asked, instead of the task's question number qi. */
+  const [follow, setFollow] = useState<string | null>(null);
+  const [submissionIds, setSubmissionIds] = useState<string[]>([]);
   const [phase, setPhase] = useState<Phase>("overview");
   const [typedMode, setTypedMode] = useState(resume?.typedMode ?? false);
   const [typed, setTyped] = useState("");
@@ -175,13 +209,15 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
   const busy = useRef(false);
   const autoStop = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const finishRef = useRef<() => void>(() => {});
+  const alive = useRef(true);
+  const answerStart = useRef(0);
 
   const task = tasks[ti];
-  const question = task.questions[qi];
+  const question = follow ?? task.questions[qi];
 
   // Recordings can't be kept after the page closes, so only the text of each answer is saved.
   useEffect(() => {
-    const complete = answers.every((row, i) => row.length >= tasks[i].questions.length);
+    const complete = answers.every((row, i) => scripted(row) >= tasks[i].questions.length);
     if (phase !== "result" && !complete) {
       onProgress?.({ answers: answers.map((row) => row.map((a) => ({ ...a, url: null }))), typedMode });
     }
@@ -193,18 +229,20 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
     return () => clearInterval(id);
   }, [phase]);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
       stopSpeaking();
       clearTimeout(autoStop.current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   const finishAll = (all: Answer[][]) => {
     onFinish?.();
-    const res = tasks.map((t, i) => all[i].map((a) => checkAnswer(t, a)));
-    tasks.forEach((t, i) => {
+    // Follow-ups are short by nature, so only answers to the task's own questions are checked.
+    const res = tasks.map((t, i) => all[i].map((a) => (a.followUp ? [] : checkAnswer(t, a))));
+    const ids = tasks.map((t, i) => {
       const flat = res[i].flat();
       recordAttempt({
         skill: "muntlig",
@@ -214,34 +252,41 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
         total: Math.max(1, flat.length),
         mode,
       });
-      addSpeaking({
+      return addSpeaking({
         promptId: t.id,
         transcript: all[i].map((a) => a.transcript).join(" "),
         seconds: all[i].reduce((n, a) => n + a.seconds, 0),
+        turns: toTurns(all[i]),
       });
     });
+    setSubmissionIds(ids);
     setResults(res);
     setPhase("result");
     window.scrollTo({ top: 0 });
   };
 
-  const ask = async (t: number, q: number) => {
+  const ask = async (t: number, q: number, followUp: string | null = null) => {
     busy.current = true;
     setTi(t);
     setQi(q);
+    setFollow(followUp);
     setPhase("ask");
     setTyped("");
-    await speak(tasks[t].questions[q], { voice: voices[0], rate: RATE[tasks[t].level] });
+    await speak(followUp ?? tasks[t].questions[q], { voice: voices[0], rate: RATE[tasks[t].level] });
+    if (!alive.current) return;
     const ok = typedMode ? false : await rec.start();
     if (!ok) setTypedMode(true);
+    // A follow-up wants a shorter answer than the task's own questions.
+    const seconds = followUp ? Math.max(20, Math.round(tasks[t].speakSeconds * 0.6)) : tasks[t].speakSeconds;
     const start = Date.now();
+    answerStart.current = start;
     setNow(start);
-    setDeadline(start + tasks[t].speakSeconds * 1000);
+    setDeadline(start + seconds * 1000);
     setPhase("record");
     busy.current = false;
     // The answer is handed in automatically when the speaking time is up.
     clearTimeout(autoStop.current);
-    autoStop.current = setTimeout(() => finishRef.current(), tasks[t].speakSeconds * 1000);
+    autoStop.current = setTimeout(() => finishRef.current(), seconds * 1000);
   };
 
   const finishAnswer = async () => {
@@ -249,12 +294,31 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
     busy.current = true;
     clearTimeout(autoStop.current);
     const r = typedMode
-      ? { url: null, transcript: typed.trim(), seconds: Math.round((Date.now() - (deadline - task.speakSeconds * 1000)) / 1000) }
+      ? { url: null, transcript: typed.trim(), seconds: Math.round((Date.now() - answerStart.current) / 1000) }
       : await rec.stop();
-    const answer: Answer = { question, url: r.url, transcript: r.transcript, seconds: r.seconds, typed: typedMode };
+    const answer: Answer = {
+      question,
+      url: r.url,
+      transcript: r.transcript,
+      seconds: r.seconds,
+      typed: typedMode,
+      ...(follow ? { followUp: true } : {}),
+    };
     const next = answers.map((row, i) => (i === ti ? [...row, answer] : row));
     setAnswers(next);
+
+    // Like the examiner at the test, the AI asks one follow-up to each of the task's questions.
+    if (ai && !follow && countWords(answer.transcript) >= 3) {
+      setPhase("think");
+      const followUp = await fetchFollowUp(task.id, next[ti]);
+      if (!alive.current) return;
+      if (followUp) {
+        void ask(ti, qi, followUp);
+        return;
+      }
+    }
     busy.current = false;
+    setFollow(null);
     if (qi + 1 < task.questions.length) {
       void ask(ti, qi + 1);
     } else if (ti + 1 < tasks.length) {
@@ -293,13 +357,18 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
                 : `, ${answers.flat().reduce((n, a) => n + (a.typed ? 0 : a.seconds), 0)} sekunder taletid`}
             </p>
             <p className="mt-4 max-w-lg text-sm leading-relaxed text-mist">
-              Hør på opptakene dine og sammenlign med eksempelsvarene. Vurdering av uttale og grammatikk kommer snart.
+              {aiAllowed
+                ? "AI-sensoren vurderer grammatikk, ordforråd og hvordan du løser oppgaven. Uttale kan den ikke høre, så lytt også til opptakene dine."
+                : "Hør på opptakene dine og sammenlign med eksempelsvarene."}
             </p>
           </div>
         </div>
         {after}
         {tasks.map((t, i) => (
-          <TaskResult key={t.id} task={t} answers={answers[i]} checks={results[i]} />
+          <div key={t.id} className="space-y-4">
+            <TaskResult task={t} answers={answers[i]} checks={results[i]} />
+            <SpeakingAiFeedback task={t} turns={toTurns(answers[i])} submissionId={submissionIds[i]} />
+          </div>
         ))}
       </div>
     );
@@ -358,6 +427,31 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
             </span>
             {typedMode && <span className="text-sm text-warn">Du skriver svarene fordi mikrofonen ikke er tilgjengelig.</span>}
           </div>
+          {aiAllowed ? (
+            <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl bg-snow p-4">
+              <input
+                type="checkbox"
+                checked={followUps}
+                onChange={(e) => setFollowUps(e.target.checked)}
+                className="mt-0.5 size-5 shrink-0 accent-[var(--fjord)]"
+              />
+              <span>
+                <span className="block font-medium">AI-sensoren stiller oppfølgingsspørsmål</span>
+                <span className="text-sm text-granite">
+                  Som på prøven: sensoren spør videre ut fra det du sier, og du må utdype svaret.
+                </span>
+              </span>
+            </label>
+          ) : (
+            !loading && (
+              <p className="mt-6 text-sm text-granite">
+                Med Premium stiller AI-sensoren oppfølgingsspørsmål og vurderer svarene dine.{" "}
+                <Link href="/priser" className="font-medium text-fjord underline-offset-4 hover:underline">
+                  Se Premium
+                </Link>
+              </p>
+            )
+          )}
           {!typedMode && (
             <button
               type="button"
@@ -370,8 +464,15 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
         </div>
       ) : (
         <div className="rounded-2xl bg-fjord-deep p-6 text-snow shadow-[0_30px_60px_-30px_rgb(15_43_60/0.7)] sm:p-8">
-          <Examiner speaking={phase === "ask"} label={phase === "ask" ? "Stiller et spørsmål …" : "Lytter til svaret ditt"} />
-          <p className="mt-6 font-display text-2xl leading-snug font-medium tracking-tight sm:text-3xl">«{question}»</p>
+          <Examiner
+            speaking={phase === "ask"}
+            label={phase === "ask" ? "Stiller et spørsmål …" : phase === "think" ? "Tenker på et oppfølgingsspørsmål …" : "Lytter til svaret ditt"}
+          />
+          <p
+            className={`mt-6 font-display text-2xl leading-snug font-medium tracking-tight transition-opacity sm:text-3xl ${phase === "think" ? "opacity-40" : ""}`}
+          >
+            «{question}»
+          </p>
 
           {phase === "record" && (
             <div className="rise mt-8">
@@ -417,14 +518,19 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
                   onClick={() => void finishAnswer()}
                   className="rounded-md bg-surface px-5 py-2.5 font-medium text-ink transition-colors hover:bg-ice"
                 >
-                  {qi + 1 < task.questions.length ? "Ferdig, neste spørsmål" : ti + 1 < tasks.length ? "Ferdig, neste del" : "Ferdig"}
+                  {(ai && !follow) || qi + 1 < task.questions.length
+                    ? "Ferdig, neste spørsmål"
+                    : ti + 1 < tasks.length
+                      ? "Ferdig, neste del"
+                      : "Ferdig"}
                 </button>
               </div>
             </div>
           )}
-          {phase === "ask" && (
-            <div className="mt-8">
-              <Wave active />
+          {(phase === "ask" || phase === "think") && (
+            <div className="mt-8" aria-live="polite">
+              <Wave active={phase === "ask"} />
+              {phase === "think" && <p className="mt-2 text-sm text-mist">Et øyeblikk …</p>}
             </div>
           )}
           {rec.error && <p className="mt-4 text-sm text-[#ffb4a8]">{rec.error}</p>}
@@ -441,6 +547,7 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
           <span className="font-semibold">{title}</span>
           <span className="ml-auto text-sm text-granite tabular-nums">
             Del {ti + 1} av {tasks.length}, spørsmål {qi + 1} av {task.questions.length}
+            {follow ? " (oppfølging)" : ""}
           </span>
         </div>
       </div>

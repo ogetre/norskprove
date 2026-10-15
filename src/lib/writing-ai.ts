@@ -30,6 +30,16 @@ const FeedbackSchema = z.object({
   improved_text: z.string(),
 });
 
+/** Rules Haiku sometimes gets backwards; shared by the writing and the speaking assessment. */
+export const GRAMMAR_RULES = `Rules learners often get wrong. Get them right in your corrections and explanations:
+- Main clauses (V2): the finite verb is always in place two. When the sentence starts with something other than the subject (a time expression, an adverb such as "dessuten" or "derfor", or a whole subordinate clause), the verb comes before the subject: "I går fikk jeg pakken", "Derfor vil jeg bytte", "Hvis det regner, blir vi hjemme".
+- In main clauses, "ikke" and other sentence adverbs (aldri, alltid, ofte, også, gjerne) come right after the finite verb: "Jeg har ikke tid". With inversion they come after the subject: "I dag har jeg ikke tid".
+- In subordinate clauses (after at, fordi, hvis, når, da, som, om, selv om, mens, før, etter at) the sentence adverb comes BEFORE the finite verb: "fordi jeg ikke har tid", "at feilen ikke er min skyld", "hvis dere ikke har den".
+- "da" is for one event in the past ("da jeg åpnet pakken"); "når" is for the present, the future and repeated events.
+- Adjectives agree with the noun: "et stort hus", "en stor leilighet", "store hus", "det store huset". Adjectives ending in -ig, -lig or -isk get no -t: "et viktig verktøy", "et vanlig hus".
+- When a sentence starts with a subordinate clause, check both parts: the word order inside the clause and the inverted verb after it ("Hvis dere ikke har den, vil jeg ...").
+- Check the preposition after verbs and adjectives: "forberedt på", "fornøyd med", "interessert i", "glad i".`;
+
 const NORWEGIAN_FEEDBACK = `Everything you write for the candidate (explanations, comments, summary, strengths, tips and the improved text) must be in Norwegian bokmål. Use Norwegian the candidate can understand at the task's level: short sentences and everyday words for A1–A2, more precise terms for B1–B2. Grammar terms are fine when you explain them simply, for example "verbet skal stå på plass nummer to i setningen".`;
 
 /** For beginners the explanations come in their own language; the Norwegian parts stay Norwegian. */
@@ -52,14 +62,7 @@ Go through the text sentence by sentence, and word by word for spelling, and fin
 - "topic": the category that fits best. v2 = word order in main clauses, leddsetning = word order in subordinate clauses, verbtid = verb forms and tense, ordvalg = wrong or unidiomatic word, rettskriving = spelling and capital letters, tegnsetting = punctuation.
 - List the errors in the order they appear in the text. If there are more than 25, include the 25 most important. If there are none, return an empty list.
 
-Rules learners often get wrong. Get them right in your corrections and explanations:
-- Main clauses (V2): the finite verb is always in place two. When the sentence starts with something other than the subject (a time expression, an adverb such as "dessuten" or "derfor", or a whole subordinate clause), the verb comes before the subject: "I går fikk jeg pakken", "Derfor vil jeg bytte", "Hvis det regner, blir vi hjemme".
-- In main clauses, "ikke" and other sentence adverbs (aldri, alltid, ofte, også, gjerne) come right after the finite verb: "Jeg har ikke tid". With inversion they come after the subject: "I dag har jeg ikke tid".
-- In subordinate clauses (after at, fordi, hvis, når, da, som, om, selv om, mens, før, etter at) the sentence adverb comes BEFORE the finite verb: "fordi jeg ikke har tid", "at feilen ikke er min skyld", "hvis dere ikke har den".
-- "da" is for one event in the past ("da jeg åpnet pakken"); "når" is for the present, the future and repeated events.
-- Adjectives agree with the noun: "et stort hus", "en stor leilighet", "store hus", "det store huset". Adjectives ending in -ig, -lig or -isk get no -t: "et viktig verktøy", "et vanlig hus".
-- When a sentence starts with a subordinate clause, check both parts: the word order inside the clause and the inverted verb after it ("Hvis dere ikke har den, vil jeg ...").
-- Check the preposition after verbs and adjectives: "forberedt på", "fornøyd med", "interessert i", "glad i".
+${GRAMMAR_RULES}
 Before you answer, check that every explanation states the rule correctly and matches its correction, and that every error you fixed in "improved_text" is also listed in "errors".
 
 ## Criteria and level

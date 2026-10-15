@@ -6,6 +6,7 @@ import { ResumeCard } from "@/components/ResumeCard";
 import { SpeakingSession, type SessionProgress } from "@/components/speaking/SpeakingSession";
 import { SPEAKING_KIND_NAMES, type SpeakingTask } from "@/content/speaking";
 import { shuffle } from "@/lib/random";
+import { scriptedCount } from "@/lib/speaking-checks";
 import { clearUnfinished, loadUnfinished, saveUnfinished, savedAtLabel } from "@/lib/unfinished";
 
 type Band = { id: string; label: string; tasks: SpeakingTask[] };
@@ -18,7 +19,7 @@ function restore(saved: Saved | null, pools: BandPools[]): (Saved & { exam: Band
   const byId = new Map(pools.flatMap((b) => b.pools.flat()).map((t) => [t.id, t]));
   const tasks = saved.band.tasks.map((id) => byId.get(id)).filter((t): t is SpeakingTask => t !== undefined);
   if (tasks.length !== saved.band.tasks.length || saved.answers.length !== tasks.length) return null;
-  if (tasks.every((t, i) => saved.answers[i].length >= t.questions.length)) return null;
+  if (tasks.every((t, i) => scriptedCount(saved.answers[i]) >= t.questions.length)) return null;
   return { ...saved, exam: { id: saved.band.id, label: saved.band.label, tasks } };
 }
 
@@ -63,9 +64,9 @@ export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
   }
 
   if (saved) {
-    const given = saved.answers.reduce((n, row) => n + row.length, 0);
+    const given = saved.answers.reduce((n, row) => n + scriptedCount(row), 0);
     const total = saved.exam.tasks.reduce((n, t) => n + t.questions.length, 0);
-    const part = saved.exam.tasks.findIndex((t, i) => saved.answers[i].length < t.questions.length);
+    const part = saved.exam.tasks.findIndex((t, i) => scriptedCount(saved.answers[i]) < t.questions.length);
     return (
       <ResumeCard
         label="Muntlig prøve"
