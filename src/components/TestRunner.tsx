@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { bandStart } from "@/lib/progress-chart";
 import { initialAnswer, totals, type Answer } from "@/lib/scoring";
 import { recordAttempt } from "@/lib/store";
 import { SKILL_NAMES, type ExamTask, type Level, type Skill } from "@/lib/types";
@@ -44,11 +45,20 @@ type Props = {
 
 const pct = (c: number, t: number) => (t ? c / t : 0);
 
-function estimate(mode: "trial" | "full", s1: number, s2: number | null, route: "easy" | "hard" | null): TestResult {
-  if (mode === "trial") return s1 >= 0.7 ? "B1" : s1 >= 0.4 ? "A2" : "A1";
-  if (route === "hard") return (s2 ?? 0) >= 0.75 ? "B2" : (s2 ?? 0) >= 0.3 ? "B1" : "A2";
-  if ((s2 ?? 0) >= 0.7) return "A2";
-  return (s2 ?? 0) >= 0.4 ? "A1" : "under A1";
+/**
+ * The level for a share of points, from three levels and the two thresholds between them,
+ * and how far into that level the share reaches, for the results chart.
+ */
+function placeOn(share: number, levels: [TestResult, TestResult, TestResult], [low, high]: [number, number]) {
+  const [i, from, to] = share >= high ? [2, high, 1] : share >= low ? [1, low, high] : [0, 0, low];
+  const level = levels[i];
+  return { level, scale: bandStart(level) + Math.min(0.99, (share - from) / Math.max(0.01, to - from)) };
+}
+
+function estimate(mode: "trial" | "full", s1: number, s2: number | null, route: "easy" | "hard" | null) {
+  if (mode === "trial") return placeOn(s1, ["A1", "A2", "B1"], [0.4, 0.7]);
+  if (route === "hard") return placeOn(s2 ?? 0, ["A2", "B1", "B2"], [0.3, 0.75]);
+  return placeOn(s2 ?? 0, ["under A1", "A1", "A2"], [0.4, 0.7]);
 }
 
 function Confirm({
@@ -145,7 +155,7 @@ export function TestRunner({
       finalTasks.flatMap((t) => t.questions),
       finalAnswers.flat(),
     );
-    const level = estimate(mode, pct(s1.correct, s1.total), s2 ? pct(s2.correct, s2.total) : null, finalRoute);
+    const { level, scale } = estimate(mode, pct(s1.correct, s1.total), s2 ? pct(s2.correct, s2.total) : null, finalRoute);
     setResult({ level, correct: all.correct, total: all.total, s1: pct(s1.correct, s1.total), s2: s2 ? pct(s2.correct, s2.total) : null });
     recordAttempt({
       skill,
@@ -155,6 +165,7 @@ export function TestRunner({
       total: all.total,
       mode,
       result: level,
+      scale,
     });
     setPhase("result");
     window.scrollTo({ top: 0 });
