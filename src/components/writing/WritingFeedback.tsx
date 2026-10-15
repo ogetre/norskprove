@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { WritingTask } from "@/content/writing";
 import type { Check } from "@/lib/writing-checks";
+import { AiFeedback } from "./AiFeedback";
 
 function CheckIcon({ ok }: { ok: boolean }) {
   return ok ? (
@@ -18,8 +19,20 @@ function CheckIcon({ ok }: { ok: boolean }) {
   );
 }
 
-/** Rule-based feedback, a self-check of the content points and the sample answer side by side. */
-export function WritingFeedback({ task, text, checks }: { task: WritingTask; text: string; checks: Check[] }) {
+/** Rule-based checks, AI feedback, a self-check of the content points and the sample answer side by side. */
+export function WritingFeedback({
+  task,
+  text,
+  checks,
+  submissionId,
+  trial = false,
+}: {
+  task: WritingTask;
+  text: string;
+  checks: Check[];
+  submissionId?: string;
+  trial?: boolean;
+}) {
   const [ticked, setTicked] = useState<boolean[]>(() => task.points.map(() => false));
   const [view, setView] = useState<"both" | "mine" | "model">("both");
   const passed = checks.filter((c) => c.ok).length;
@@ -46,11 +59,9 @@ export function WritingFeedback({ task, text, checks }: { task: WritingTask; tex
             </li>
           ))}
         </ul>
-        <p className="mt-5 flex items-start gap-2 rounded-lg bg-note px-4 py-3 text-sm leading-relaxed text-note-ink">
-          <span aria-hidden="true">✦</span>
-          Tilbakemelding på grammatikk og ordforråd med nivåvurdering kommer snart. Sammenlign så lenge med eksempelteksten.
-        </p>
       </section>
+
+      <AiFeedback task={task} text={text} submissionId={submissionId} trial={trial} />
 
       <section className="rounded-2xl bg-surface p-6 ring-1 ring-ice sm:p-7" aria-labelledby="points-title">
         <h2 id="points-title" className="text-xl font-semibold">

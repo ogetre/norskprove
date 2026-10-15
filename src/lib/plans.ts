@@ -13,6 +13,11 @@ export function planCovers(plan: PlanId | null, skill: Skill): boolean {
   return plan !== null && PLAN_SKILLS[plan].includes(skill);
 }
 
+/** AI feedback on written texts is part of Premium. */
+export function planHasAiFeedback(plan: PlanId | null): boolean {
+  return plan === "premium";
+}
+
 export interface Plan {
   id: PlanId;
   name: string;
@@ -55,7 +60,8 @@ export const PLANS: Plan[] = [
     tagline: "For deg som skal ta prøven snart.",
     features: [
       "Alt i Pluss",
-      "AI-tilbakemelding på skriving og muntlig (kommer snart)",
+      "AI-tilbakemelding på skriving: feil, rettelser og nivå",
+      "AI-tilbakemelding på muntlig (kommer snart)",
       "Rapport med det du bør øve mest på",
       "Nye oppgaver hver måned",
     ],

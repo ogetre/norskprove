@@ -9,6 +9,7 @@ import type {
   Skill,
   SpeakingSubmission,
   SrsState,
+  WritingFeedback,
   WritingSubmission,
 } from "./types";
 import { clearAllUnfinished } from "./unfinished";
@@ -152,6 +153,22 @@ export function addWriting(sub: Omit<WritingSubmission, "id" | "at">): string {
   return id;
 }
 
+/** Saves AI feedback that arrived after the text was handed in. */
+export function attachWritingFeedback(id: string, feedback: WritingFeedback) {
+  update((s) => {
+    if (!s.writing.some((w) => w.id === id && !w.feedback)) return s;
+    const errors = { ...s.grammarErrors };
+    for (const e of feedback.errors) {
+      errors[e.topic] = (errors[e.topic] ?? 0) + 1;
+    }
+    return {
+      ...s,
+      grammarErrors: errors,
+      writing: s.writing.map((w) => (w.id === id ? { ...w, feedback } : w)),
+    };
+  });
+}
+
 export function addSpeaking(sub: Omit<SpeakingSubmission, "id" | "at">): string {
   const id = newId();
   update((s) =>
@@ -224,6 +241,12 @@ export function mergeStates(local: AppState, remote: AppState): AppState {
     grammarErrors[topic] = Math.max(grammarErrors[topic] ?? 0, n);
   }
 
+  // AI feedback can reach this device before the account has it; keep it.
+  const localFeedback = new Map(local.writing.flatMap((w) => (w.feedback ? [[w.id, w.feedback] as const] : [])));
+  const writing = union(local.writing, remote.writing ?? []).map((w) =>
+    w.feedback || !localFeedback.has(w.id) ? w : { ...w, feedback: localFeedback.get(w.id) },
+  );
+
   return {
     ...initialState,
     profile: {
@@ -233,7 +256,7 @@ export function mergeStates(local: AppState, remote: AppState): AppState {
     },
     testLevels: { ...local.testLevels, ...remote.testLevels },
     attempts: union(local.attempts, remote.attempts ?? []),
-    writing: union(local.writing, remote.writing ?? []).reverse(),
+    writing: writing.reverse(),
     speaking: union(local.speaking, remote.speaking ?? []).reverse(),
     srs,
     grammarErrors,

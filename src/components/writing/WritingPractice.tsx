@@ -26,7 +26,7 @@ function Practice({
 }) {
   const draftKey = `${mode}-${task.id}`;
   const [text, setText] = useState(() => loadDraft(draftKey));
-  const [result, setResult] = useState<{ text: string; checks: Check[] } | null>(null);
+  const [result, setResult] = useState<{ id: string; text: string; checks: Check[] } | null>(null);
   const [deadline] = useState(() => Date.now() + task.minutes * 60_000);
   const [now, setNow] = useState(() => Date.now());
   const submitted = useRef(false);
@@ -37,9 +37,9 @@ function Practice({
     const checks = checkWriting(task, final);
     const passed = checks.filter((c) => c.ok).length;
     recordAttempt({ skill: "skriving", taskId: task.id, level: task.level, correct: passed, total: checks.length, mode });
-    addWriting({ promptId: task.id, text: final, words: countWords(final) });
+    const id = addWriting({ promptId: task.id, text: final, words: countWords(final) });
     clearDraft(draftKey);
-    setResult({ text: final, checks });
+    setResult({ id, text: final, checks });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -75,7 +75,13 @@ function Practice({
           </div>
         </div>
         {after}
-        <WritingFeedback task={task} text={result.text} checks={result.checks} />
+        <WritingFeedback
+          task={task}
+          text={result.text}
+          checks={result.checks}
+          submissionId={result.id}
+          trial={mode === "trial"}
+        />
       </div>
     );
   }
