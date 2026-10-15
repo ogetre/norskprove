@@ -223,9 +223,22 @@ export interface WritingSubmission {
 export interface SpeakingFeedback {
   level_estimate: "A1" | "A2" | "B1" | "B2" | "C1";
   summary: string;
+  /** Missing on feedback saved before criteria were assessed. */
+  criteria?: { name: string; level: string; comment: string }[];
   strengths: string[];
-  improvements: { original: string; better: string; explanation: string }[];
+  /** Errors and unnatural phrasing; "original" is copied from one of the answers. */
+  improvements: { original: string; better: string; explanation: string; topic?: string }[];
   model_answer: string;
+  /** Language of the explanations when not Norwegian (A1–A2 learners). */
+  lang?: string;
+}
+
+/** One question from the examiner and what the candidate answered. */
+export interface SpeakingTurn {
+  question: string;
+  answer: string;
+  /** Asked by the AI examiner in response to the previous answer. */
+  followUp?: boolean;
 }
 
 export interface SpeakingSubmission {
@@ -234,6 +247,8 @@ export interface SpeakingSubmission {
   transcript: string;
   seconds: number;
   at: string;
+  /** The questions and answers; missing on answers saved before they were kept. */
+  turns?: SpeakingTurn[];
   feedback?: SpeakingFeedback;
 }
 

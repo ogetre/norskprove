@@ -1,5 +1,5 @@
 import { locateErrors } from "./error-spans";
-import type { AppState, SrsState } from "./types";
+import type { AppState, SrsState, WritingFeedback } from "./types";
 
 /*
  * Exercises made from the learner's own errors in AI writing feedback. Each error becomes
@@ -26,6 +26,8 @@ export interface Drill {
   writable: boolean;
   submissionId: string;
   taskId: string;
+  /** Where the error was made. */
+  source: "skriving" | "muntlig";
 }
 
 /** An exercise counts as learnt once its next review is a week or more away. */
@@ -53,29 +55,74 @@ function isReorder(original: string, correction: string): boolean {
   return [...a].sort().join(" ") === [...b].sort().join(" ");
 }
 
-/** The sentence around [start, end) in the text, split at the error. */
-function context(text: string, start: number, end: number): { before: string; after: string } {
+type Span = { start: number; end: number; correction: string };
+
+/**
+ * The sentence around [start, end) in the text, split at the error. Other errors in the
+ * sentence are shown corrected, so only the one being practised is wrong.
+ */
+function context(text: string, { start, end }: Span, others: Span[]): { before: string; after: string } {
   if (start < 0) return { before: "", after: "" };
+  const fixed = (a: number, b: number) => {
+    let out = "";
+    let pos = a;
+    for (const o of others.filter((o) => o.start >= a && o.end <= b)) {
+      out += text.slice(pos, o.start) + o.correction;
+      pos = o.end;
+    }
+    return out + text.slice(pos, b);
+  };
   const stops = /[.!?\n]/;
   let from = start;
   while (from > 0 && !stops.test(text[from - 1])) from--;
   let to = end;
   while (to < text.length && !stops.test(text[to])) to++;
   if (to < text.length && text[to] !== "\n") to++;
-  let before = text.slice(from, start).trimStart();
-  let after = text.slice(end, to).trimEnd();
+  let before = fixed(from, start).trimStart();
+  let after = fixed(end, to).trimEnd();
   if (before.length > 90) before = "… " + before.slice(-90).replace(/^\S*\s/, "");
   if (after.length > 90) after = after.slice(0, 90).replace(/\s\S*$/, "") + " …";
   return { before, after };
 }
 
-/** Every error from the learner's feedback as an exercise, newest text first, without repeats. */
+type Source = { id: string; taskId: string; source: Drill["source"]; text: string; lang?: string; errors: WritingFeedback["errors"] };
+
+/** Written texts and spoken answers with AI feedback, newest first within each. */
+function sources(state: AppState): Source[] {
+  const written = state.writing.flatMap((w) =>
+    w.feedback ? [{ id: w.id, taskId: w.promptId, source: "skriving" as const, text: w.text, lang: w.feedback.lang, errors: w.feedback.errors }] : [],
+  );
+  const spoken = state.speaking.flatMap((s) =>
+    s.feedback
+      ? [
+          {
+            id: s.id,
+            taskId: s.promptId,
+            source: "muntlig" as const,
+            // One answer per line, so a sentence never runs from one answer into the next.
+            text: s.turns ? s.turns.map((t) => t.answer).join("\n") : s.transcript,
+            lang: s.feedback.lang,
+            errors: s.feedback.improvements.map((e) => ({
+              original: e.original,
+              correction: e.better,
+              explanation: e.explanation,
+              topic: e.topic ?? "annet",
+            })),
+          },
+        ]
+      : [],
+  );
+  return [...written, ...spoken];
+}
+
+/** Every error from the learner's feedback as an exercise, newest first, without repeats. */
 export function collectDrills(state: AppState): Drill[] {
   const seen = new Set<string>();
   const drills: Drill[] = [];
-  for (const sub of state.writing) {
-    if (!sub.feedback) continue;
-    for (const e of locateErrors(sub.text, sub.feedback.errors)) {
+  for (const sub of sources(state)) {
+    const located = locateErrors(sub.text, sub.errors);
+    const spans = located.filter((e) => e.start >= 0).sort((a, b) => a.start - b.start);
+    for (const e of located) {
       const original = e.original.trim();
       const correction = e.correction.trim();
       const same = `${original.toLowerCase()}→${correction.toLowerCase()}`;
@@ -88,12 +135,17 @@ export function collectDrills(state: AppState): Drill[] {
         original,
         correction,
         explanation: e.explanation,
-        lang: sub.feedback.lang,
-        ...context(sub.text, e.start, e.end),
+        lang: sub.lang,
+        ...context(
+          sub.text,
+          e,
+          spans.filter((o) => o !== e),
+        ),
         reorder,
         writable: !reorder && TYPED_TOPICS.has(e.topic) && splitWords(correction).length <= 3,
         submissionId: sub.id,
-        taskId: sub.promptId,
+        taskId: sub.taskId,
+        source: sub.source,
       });
     }
   }

@@ -2,7 +2,20 @@ import type { SpeakingTask } from "@/content/speaking";
 import { levelIndex } from "./levels";
 import { countWords, usedConnectors, type Check } from "./writing-checks";
 
-export type Answer = { question: string; url: string | null; transcript: string; seconds: number; typed: boolean };
+export type Answer = {
+  question: string;
+  url: string | null;
+  transcript: string;
+  seconds: number;
+  typed: boolean;
+  /** A follow-up question from the AI examiner, not one of the task's own. */
+  followUp?: boolean;
+};
+
+/** Answers to a task's own questions; the AI examiner's follow-ups come in between. */
+export function scriptedCount(row: Answer[]): number {
+  return row.filter((a) => !a.followUp).length;
+}
 
 /** Rule-based checks of one spoken answer. AI assessment of the language comes later. */
 export function checkAnswer(task: SpeakingTask, a: Answer): Check[] {

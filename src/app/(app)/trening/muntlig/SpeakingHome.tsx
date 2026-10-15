@@ -39,7 +39,10 @@ export function SpeakingHome({ groups }: { groups: Group[] }) {
             <h2 id="speak-title" className="font-display text-2xl font-medium tracking-tight">
               Øv på én oppgave
             </h2>
-            <p className="mt-1 text-granite">Du hører spørsmålet, svarer muntlig og kan lytte til opptaket ditt etterpå.</p>
+            <p className="mt-1 max-w-2xl text-granite">
+              Du hører spørsmålet, svarer muntlig og kan lytte til opptaket ditt etterpå. Med Premium stiller AI-sensoren
+              oppfølgingsspørsmål og vurderer svarene dine.
+            </p>
           </div>
           <LevelFilter value={level} onChange={setLevel} counts={levelCounts(groups.flatMap((g) => g.tasks))} />
         </div>

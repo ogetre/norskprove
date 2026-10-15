@@ -227,10 +227,14 @@ function DrillCard({ drill, kind, onNext }: { drill: Drill; kind: DrillKind; onN
               </button>
             )}
             <Link
-              href={`/trening/skriving/oppgave/${drill.taskId}?tekst=${drill.submissionId}`}
+              href={
+                drill.source === "muntlig"
+                  ? `/trening/muntlig/oppgave/${drill.taskId}`
+                  : `/trening/skriving/oppgave/${drill.taskId}?tekst=${drill.submissionId}`
+              }
               className="text-sm font-medium text-fjord underline-offset-4 hover:underline"
             >
-              Se teksten feilen kom fra
+              {drill.source === "muntlig" ? "Se oppgaven feilen kom fra" : "Se teksten feilen kom fra"}
             </Link>
           </div>
         </div>
@@ -329,8 +333,8 @@ export function ErrorsView() {
       </nav>
       <h1 className="mt-5 font-display text-3xl font-medium tracking-tight sm:text-4xl">Øv på feilene dine</h1>
       <p className="mt-2 max-w-2xl text-granite">
-        Feilene AI-sensoren fant i tekstene dine, blir til små øvelser. De kommer tilbake over flere dager, til du ikke gjør
-        dem lenger.
+        Feilene AI-sensoren fant i tekstene og de muntlige svarene dine, blir til små øvelser. De kommer tilbake over flere
+        dager, til du ikke gjør dem lenger.
       </p>
 
       {round ? (
@@ -341,7 +345,8 @@ export function ErrorsView() {
         <div className="mt-8 rounded-2xl bg-surface p-7 ring-1 ring-ice sm:p-8">
           <p className="font-display text-2xl font-medium tracking-tight">Ingen feil å øve på ennå</p>
           <p className="mt-2 max-w-xl text-granite">
-            Skriv en tekst og få tilbakemelding fra AI-sensoren. Feilene du gjør, dukker opp her som øvelser.
+            Skriv en tekst eller svar på en muntlig oppgave, og få tilbakemelding fra AI-sensoren. Feilene du gjør, dukker opp
+            her som øvelser.
           </p>
           <Link
             href="/trening/skriving"
@@ -358,7 +363,7 @@ export function ErrorsView() {
                 {queue.length ? `${queue.length} øvelser i dag` : "Ingen øvelser i dag"}
               </p>
               <p className="mt-1 text-mist">
-                {drills.length} feil fra {texts} {texts === 1 ? "tekst" : "tekster"}, {drills.filter(learnt).length} lært.
+                {drills.length} feil fra {texts} {texts === 1 ? "oppgave" : "oppgaver"}, {drills.filter(learnt).length} lært.
               </p>
             </div>
             {queue.length > 0 && (

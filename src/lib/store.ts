@@ -7,6 +7,7 @@ import type {
   Level,
   Profile,
   Skill,
+  SpeakingFeedback,
   SpeakingSubmission,
   SavedWord,
   SrsState,
@@ -181,6 +182,18 @@ export function addSpeaking(sub: Omit<SpeakingSubmission, "id" | "at">): string 
   return id;
 }
 
+/** Saves AI's assessment of spoken answers that arrived after they were handed in. */
+export function attachSpeakingFeedback(id: string, feedback: SpeakingFeedback) {
+  update((s) => {
+    if (!s.speaking.some((w) => w.id === id && !w.feedback)) return s;
+    const errors = { ...s.grammarErrors };
+    for (const e of feedback.improvements) {
+      if (e.topic) errors[e.topic] = (errors[e.topic] ?? 0) + 1;
+    }
+    return { ...s, grammarErrors: errors, speaking: s.speaking.map((w) => (w.id === id ? { ...w, feedback } : w)) };
+  });
+}
+
 /** Saves the learner's own corrections of a text and AI's check of them. */
 export function saveRevision(id: string, revision: NonNullable<WritingSubmission["revision"]>) {
   update((s) => ({ ...s, writing: s.writing.map((w) => (w.id === id ? { ...w, revision } : w)) }));
@@ -273,6 +286,8 @@ export function mergeStates(local: AppState, remote: AppState): AppState {
     return { ...w, feedback: w.feedback ?? mine.feedback, revision };
   });
 
+  const localSpeaking = new Map(local.speaking.map((w) => [w.id, w]));
+
   return {
     ...initialState,
     profile: {
@@ -283,7 +298,9 @@ export function mergeStates(local: AppState, remote: AppState): AppState {
     testLevels: { ...local.testLevels, ...remote.testLevels },
     attempts: union(local.attempts, remote.attempts ?? []),
     writing: writing.reverse(),
-    speaking: union(local.speaking, remote.speaking ?? []).reverse(),
+    speaking: union(local.speaking, remote.speaking ?? [])
+      .map((w) => (w.feedback || !localSpeaking.get(w.id)?.feedback ? w : { ...w, feedback: localSpeaking.get(w.id)!.feedback }))
+      .reverse(),
     srs,
     words: union(local.words ?? [], remote.words ?? []).reverse(),
     grammarErrors,

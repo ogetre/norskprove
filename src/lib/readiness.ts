@@ -5,7 +5,7 @@ import { SKILL_NAMES, type AppState, type ExamGoal, type Level, type Skill } fro
 /*
  * «Er jeg klar?»: how sure we are that the learner would pass each part at their target
  * level. A part is only «klar» on evidence close to the exam: a recent full test, or for
- * writing, AI assessments of several recent texts. Practice alone gives «trolig».
+ * writing and speaking, AI assessments of several recent answers. Practice alone gives «trolig».
  */
 
 export type ReadinessStatus = "klar" | "trolig" | "nesten" | "langt" | "ukjent";
@@ -60,15 +60,17 @@ export function partReadiness(state: AppState, skill: Skill, target: Level): Par
     return { skill, status: "klar", level: estimate, evidence: `Du fikk ${lastFull.result} på en full delprøve ${shortDate(lastFull.at)}.`, action: null };
   }
 
-  if (skill === "skriving") {
-    const graded = state.writing.filter((w) => w.feedback).slice(0, 3);
+  if (skill === "skriving" || skill === "muntlig") {
+    const subs: { at: string; feedback?: { level_estimate: string } }[] = skill === "skriving" ? state.writing : state.speaking;
+    const graded = subs.filter((w) => w.feedback).slice(0, 3);
     const enough = graded.filter((w) => at(w.feedback!.level_estimate) >= t).length;
     if (graded.length >= 2 && enough >= 2 && ageInDays(graded[0].at) <= FRESH_DAYS) {
+      const what = skill === "skriving" ? "tekstene dine" : "muntlige oppgavene dine";
       return {
         skill,
         status: "klar",
         level: estimate,
-        evidence: `AI-sensoren vurderte ${enough} av de siste ${graded.length} tekstene dine til ${target} eller høyere.`,
+        evidence: `AI-sensoren vurderte ${enough} av de siste ${graded.length} ${what} til ${target} eller høyere.`,
         action: null,
       };
     }
@@ -88,7 +90,7 @@ export function partReadiness(state: AppState, skill: Skill, target: Level): Par
       skill === "skriving"
         ? "Få AI-vurdering av et par tekster til for å bekrefte det."
         : skill === "muntlig"
-          ? "Ta en muntlig prøve for å øve på hele prøven."
+          ? "Få AI-vurdering av et par muntlige oppgaver til for å bekrefte det."
           : `Bekreft det med en full delprøve på ${target}.`;
     return {
       skill,
