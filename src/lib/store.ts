@@ -181,6 +181,11 @@ export function addSpeaking(sub: Omit<SpeakingSubmission, "id" | "at">): string 
   return id;
 }
 
+/** Saves the learner's own corrections of a text and AI's check of them. */
+export function saveRevision(id: string, revision: NonNullable<WritingSubmission["revision"]>) {
+  update((s) => ({ ...s, writing: s.writing.map((w) => (w.id === id ? { ...w, revision } : w)) }));
+}
+
 /** Saves a word to practise; a word already saved keeps its place and review history. */
 export function saveWord(word: SavedWord) {
   update((s) => {
@@ -259,11 +264,14 @@ export function mergeStates(local: AppState, remote: AppState): AppState {
     grammarErrors[topic] = Math.max(grammarErrors[topic] ?? 0, n);
   }
 
-  // AI feedback can reach this device before the account has it; keep it.
-  const localFeedback = new Map(local.writing.flatMap((w) => (w.feedback ? [[w.id, w.feedback] as const] : [])));
-  const writing = union(local.writing, remote.writing ?? []).map((w) =>
-    w.feedback || !localFeedback.has(w.id) ? w : { ...w, feedback: localFeedback.get(w.id) },
-  );
+  // AI feedback and own corrections can reach this device before the account has them; keep them.
+  const localById = new Map(local.writing.map((w) => [w.id, w]));
+  const writing = union(local.writing, remote.writing ?? []).map((w) => {
+    const mine = localById.get(w.id);
+    if (!mine) return w;
+    const revision = !mine.revision || (w.revision && w.revision.at >= mine.revision.at) ? w.revision : mine.revision;
+    return { ...w, feedback: w.feedback ?? mine.feedback, revision };
+  });
 
   return {
     ...initialState,
