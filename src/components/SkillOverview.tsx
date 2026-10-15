@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { ResultsChart, type ResultPoint } from "./ResultsChart";
+import { ResultsChart } from "./ResultsChart";
 import { SkillIcon } from "./SkillIcon";
 import { estimateLevel } from "@/lib/levels";
+import { chartPoints, testResults } from "@/lib/progress-chart";
 import { useAppState, useHydrated } from "@/lib/store";
 import { LEVELS, SKILL_NAMES, type Skill } from "@/lib/types";
 import { useHasUnfinished } from "@/lib/unfinished";
-
-const MODE_NAME = { quick: "Øving", full: "Full delprøve", trial: "Prøvetest", text: "Oppgave" } as const;
 
 const card = "rounded-2xl bg-surface p-5 ring-1 ring-ice sm:p-6";
 
@@ -18,16 +17,8 @@ export function SkillOverview({ skill, official }: { skill: Skill; official: str
   const hydrated = useHydrated();
   const attempts = hydrated ? state.attempts.filter((a) => a.skill === skill) : [];
   const level = hydrated ? estimateLevel(state, skill) : undefined;
-  const fulls = attempts.filter((a) => a.mode === "full");
-
-  const points: ResultPoint[] = attempts.slice(-14).map((a) => {
-    const d = new Date(a.at).toLocaleDateString("nb-NO", { day: "numeric", month: "short" }).replace(".", "");
-    return {
-      label: d,
-      detail: `${MODE_NAME[a.mode ?? "text"]}, ${d}`,
-      value: Math.round((a.correct / Math.max(1, a.total)) * 100),
-    };
-  });
+  const fulls = hydrated ? testResults(state, skill).filter((t) => t.mode === "full") : [];
+  const points = hydrated ? chartPoints(state, skill) : [];
 
   return (
     <>
@@ -53,10 +44,11 @@ export function SkillOverview({ skill, official }: { skill: Skill; official: str
         <section className={card} aria-labelledby="chart-title">
           <h2 id="chart-title" className="font-semibold">Resultatene dine</h2>
           <p className="text-sm text-granite">
-            {skill === "skriving" || skill === "muntlig" ? "Prosent oppfylte krav" : "Prosent riktig"} i de siste øktene
+            Nivået du viser i delprøver og oppgaver, økt for økt
+            {skill === "skriving" ? ". Tekster med AI-tilbakemelding får nivået fra sensoren." : ""}
           </p>
           <div className="mt-4">
-            <ResultsChart points={points} />
+            <ResultsChart points={points} level={level} />
           </div>
         </section>
         <section className={`${card} flex flex-col`} aria-labelledby="level-title">

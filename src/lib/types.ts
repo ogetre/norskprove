@@ -178,6 +178,10 @@ export interface Attempt {
   mode?: Mode;
   /** Level result of a full or trial test. */
   result?: Level | "under A1";
+  /** Place on the results chart's level scale (0 under A1 … 5 top of B2), when the test knows it. */
+  scale?: number;
+  /** The written text this attempt was for. */
+  submissionId?: string;
 }
 
 export interface WritingFeedback {

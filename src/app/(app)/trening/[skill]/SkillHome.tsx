@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useState } from "react";
 import { LevelFilter, levelCounts, type LevelChoice } from "@/components/LevelFilter";
-import { ResultsChart, type ResultPoint } from "@/components/ResultsChart";
+import { ResultsChart } from "@/components/ResultsChart";
 import { SkillIcon } from "@/components/SkillIcon";
 import { UnfinishedNote } from "@/components/SkillOverview";
 import { estimateLevel } from "@/lib/levels";
+import { chartPoints, testResults } from "@/lib/progress-chart";
 import { useAppState, useHydrated } from "@/lib/store";
 import { useHasUnfinished } from "@/lib/unfinished";
 import { LEVELS, QUESTION_KIND_NAMES, SKILL_NAMES, type Level, type QuestionKind, type Skill } from "@/lib/types";
@@ -22,8 +23,6 @@ const KIND_HINT: Record<QuestionKind, string> = {
   order: "Sett setninger eller steg i riktig rekkefølge.",
   gap: "Velg ordet som passer i hullet.",
 };
-
-const MODE_NAME = { quick: "Hurtigøving", full: "Full delprøve", trial: "Prøvetest", text: "Tekst" } as const;
 
 /** Tasks shown in the list before «Vis flere». */
 const PAGE = 20;
@@ -54,14 +53,8 @@ export function SkillHome({
   const done = new Set(attempts.map((a) => a.taskId));
   const listed = tasks.filter((t) => filter === "alle" || t.level === filter);
 
-  const points: ResultPoint[] = attempts.slice(-14).map((a) => {
-    const d = new Date(a.at).toLocaleDateString("nb-NO", { day: "numeric", month: "short" }).replace(".", "");
-    return {
-      label: d,
-      detail: `${MODE_NAME[a.mode ?? "text"]}, ${d}`,
-      value: Math.round((a.correct / Math.max(1, a.total)) * 100),
-    };
-  });
+  const points = hydrated ? chartPoints(state, skill) : [];
+  const pastTests = hydrated ? testResults(state, skill).filter((t) => t.mode === "full").reverse().slice(0, 6) : [];
 
   return (
     <>
@@ -86,9 +79,9 @@ export function SkillHome({
       <div className="mt-8 grid gap-3 lg:grid-cols-[1.7fr_1fr]">
         <section className={card} aria-labelledby="chart-title">
           <h2 id="chart-title" className="font-semibold">Resultatene dine</h2>
-          <p className="text-sm text-granite">Prosent riktig i de siste øktene</p>
+          <p className="text-sm text-granite">Nivået du viser i delprøver og oppgaver, økt for økt</p>
           <div className="mt-4">
-            <ResultsChart points={points} />
+            <ResultsChart points={points} level={level} />
           </div>
         </section>
         <section className={`${card} flex flex-col`} aria-labelledby="level-title">
@@ -148,6 +141,28 @@ export function SkillHome({
                 </Link>
               </div>
             </div>
+            {pastTests.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-granite">Tidligere delprøver</h3>
+                <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {pastTests.map((t) => (
+                    <li key={t.at} className="flex items-center gap-3 rounded-xl bg-surface px-4 py-3 ring-1 ring-ice">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-[var(--chart-test)]/12 font-display text-sm font-medium text-[var(--chart-test)]">
+                        {t.parts[0].result === "under A1" ? "<A1" : (t.parts[0].result ?? "–")}
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="block font-medium">
+                          {new Date(t.at).toLocaleDateString("nb-NO", { day: "numeric", month: "long" })}
+                        </span>
+                        <span className="text-granite tabular-nums">
+                          {t.parts[0].correct} av {t.parts[0].total} poeng
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
 
           <section className="mt-12" aria-labelledby="quick-title">

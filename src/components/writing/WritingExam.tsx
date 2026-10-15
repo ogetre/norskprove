@@ -67,8 +67,17 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
     const all = band.tasks.map((task, i) => checkWriting(task, texts[i]));
     const ids = band.tasks.map((task, i) => {
       const passed = all[i].filter((c) => c.ok).length;
-      recordAttempt({ skill: "skriving", taskId: task.id, level: task.level, correct: passed, total: all[i].length, mode: "full" });
-      return addWriting({ promptId: task.id, text: texts[i], words: countWords(texts[i]) });
+      const id = addWriting({ promptId: task.id, text: texts[i], words: countWords(texts[i]) });
+      recordAttempt({
+        skill: "skriving",
+        taskId: task.id,
+        level: task.level,
+        correct: passed,
+        total: all[i].length,
+        mode: "full",
+        submissionId: id,
+      });
+      return id;
     });
     setResults(all);
     setSubmissionIds(ids);
@@ -206,9 +215,12 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
           checks={results[view]}
           submissionId={submissionIds[view]}
         />
-        <Link href="/trening/skriving" className="inline-flex rounded-md px-5 py-2.5 font-medium text-granite ring-1 ring-ice hover:text-ink">
-          Tilbake til skriving
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          <Link href="/trening/skriving" className="inline-flex rounded-md px-5 py-2.5 font-medium text-granite ring-1 ring-ice hover:text-ink">
+            Tilbake til skriving
+          </Link>
+          <p className="text-sm text-granite">Tekstene og tilbakemeldingen er lagret under «Dine tekster» på skrivesiden.</p>
+        </div>
       </div>
     );
   }

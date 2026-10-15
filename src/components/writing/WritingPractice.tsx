@@ -36,8 +36,8 @@ function Practice({
     submitted.current = true;
     const checks = checkWriting(task, final);
     const passed = checks.filter((c) => c.ok).length;
-    recordAttempt({ skill: "skriving", taskId: task.id, level: task.level, correct: passed, total: checks.length, mode });
     const id = addWriting({ promptId: task.id, text: final, words: countWords(final) });
+    recordAttempt({ skill: "skriving", taskId: task.id, level: task.level, correct: passed, total: checks.length, mode, submissionId: id });
     clearDraft(draftKey);
     setResult({ id, text: final, checks });
     window.scrollTo({ top: 0, behavior: "smooth" });

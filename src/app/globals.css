@@ -20,6 +20,9 @@
   --note-ink: #7a5310;
   --grid: #e4ecef;
   --hero-glow: #e6eef1;
+  /* Results chart lines; checked for colour-blind separation and contrast on the surface */
+  --chart-task: #2b6cb0;
+  --chart-test: #b83a2b;
   /* Landscape and level ridge */
   --land-far: #9db3bf;
   --land-mid: #6f8e9f;
@@ -54,6 +57,8 @@
   --note-ink: #ebc97f;
   --grid: #1e3544;
   --hero-glow: #16344a;
+  --chart-task: #3f8fcb;
+  --chart-test: #d5553f;
   --land-far: #2c475a;
   --land-mid: #1d3446;
   --land-near: #0c1d28;

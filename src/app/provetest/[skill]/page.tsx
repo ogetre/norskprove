@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
+import { FreshVisit } from "@/components/FreshVisit";
 import { SKILLS } from "@/components/SkillIcon";
 import { TestRunner } from "@/components/TestRunner";
 import { content, pickTasks } from "@/content";
@@ -29,14 +30,16 @@ async function TrialPageContent({ params }: { params: PageProps<"/provetest/[ski
   const tasks = pickTasks(info.skill, c.tests.trial);
 
   return (
-    <TestRunner
-      skill={info.skill}
-      mode="trial"
-      minutes={info.trialMinutes}
-      stage1={tasks}
-      backHref="/provetest"
-      afterResult={<TrialOffer authEnabled={authEnabled} />}
-    />
+    <FreshVisit>
+      <TestRunner
+        skill={info.skill}
+        mode="trial"
+        minutes={info.trialMinutes}
+        stage1={tasks}
+        backHref="/provetest"
+        afterResult={<TrialOffer authEnabled={authEnabled} />}
+      />
+    </FreshVisit>
   );
 }
 

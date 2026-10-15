@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { Paywall } from "@/components/Access";
+import { FreshVisit } from "@/components/FreshVisit";
 import { FullTest } from "@/components/FullTest";
 import { content } from "@/content";
 import type { Skill } from "@/lib/types";
@@ -16,9 +17,11 @@ async function FullTestPageContent({ params }: { params: PageProps<"/trening/[sk
   const s = skill as Skill;
 
   return (
-    <Paywall skill={s} feature="Full delprøve">
-      <FullTest skill={s} tasks={c.tasks} plan={c.tests.full} />
-    </Paywall>
+    <FreshVisit>
+      <Paywall skill={s} feature="Full delprøve">
+        <FullTest skill={s} tasks={c.tasks} plan={c.tests.full} />
+      </Paywall>
+    </FreshVisit>
   );
 }
 

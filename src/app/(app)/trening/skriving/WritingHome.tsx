@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { LevelFilter, levelCounts, type LevelChoice } from "@/components/LevelFilter";
 import { FullTestBanner, SkillOverview } from "@/components/SkillOverview";
+import { WritingHistory } from "@/components/writing/WritingHistory";
 import { useAppState, useHydrated } from "@/lib/store";
 import type { Level } from "@/lib/types";
 
@@ -35,6 +36,10 @@ export function WritingHome({ groups, bands }: { groups: Group[]; bands: string[
         href="/trening/skriving/prove"
         title="Full delprøve"
         text={`Velg nivå som på prøven: ${bands.join(", ")}. Du skriver flere tekster med felles tidtaker og uten stavekontroll.`}
+      />
+
+      <WritingHistory
+        tasks={Object.fromEntries(groups.flatMap((g) => g.tasks.map((t) => [t.id, { title: t.title, level: t.level }])))}
       />
 
       <section className="mt-12" aria-labelledby="write-title">
