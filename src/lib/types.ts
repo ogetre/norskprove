@@ -198,6 +198,15 @@ export interface WritingFeedback {
   strengths: string[];
   improved_text: string;
   tips: string[];
+  /** Language of the explanations when not Norwegian (A1–A2 learners). */
+  lang?: string;
+}
+
+/** AI's check of a learner's own corrections; results are by error number, from 1. */
+export interface WritingRecheck {
+  results: { index: number; fixed: boolean; comment: string }[];
+  new_errors: { original: string; correction: string; explanation: string }[];
+  summary: string;
 }
 
 export interface WritingSubmission {
@@ -207,6 +216,8 @@ export interface WritingSubmission {
   words: number;
   at: string;
   feedback?: WritingFeedback;
+  /** The learner's own corrections after the feedback, and AI's check of them. */
+  revision?: { text: string; at: string; check: WritingRecheck };
 }
 
 export interface SpeakingFeedback {

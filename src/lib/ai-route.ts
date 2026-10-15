@@ -4,6 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { recordTokens, releaseCheck, reserveCheck, userDailyLimit, type AiKind } from "./ai-usage";
 import { authEnabled } from "./auth-config";
 import { Refused } from "./claude";
+import { planHasAiFeedback } from "./plans";
+import { activePlan } from "./subscription";
 
 // Locally the AI features can be tried without signing in.
 const isDev = process.env.NODE_ENV === "development";
@@ -27,11 +29,15 @@ function notBilled(err: unknown): boolean {
 export async function withAiLimits(
   kind: AiKind,
   run: (onUsage: (input: number, output: number) => Promise<void>) => Promise<object>,
+  { premium = false }: { premium?: boolean } = {},
 ): Promise<Response> {
   if (!process.env.ANTHROPIC_API_KEY) return fail("AI er ikke satt opp ennå.", 503);
 
   const userId = authEnabled ? (await auth()).userId : null;
   if (!userId && !isDev) return fail("Logg inn for å bruke dette.", 401);
+  if (premium && userId && !isDev && !planHasAiFeedback(await activePlan(userId))) {
+    return fail("AI-tilbakemelding er med i Premium.", 403);
+  }
 
   if (userId) {
     const reserved = await reserveCheck(userId, kind);

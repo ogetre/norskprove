@@ -6,10 +6,12 @@ import { useAccess } from "@/components/Access";
 import type { WritingTask } from "@/content/writing";
 import { locateErrors, type LocatedError } from "@/lib/error-spans";
 import { FEEDBACK_LEVELS, topicName, type FeedbackLevel } from "@/lib/feedback-topics";
+import { useNativeLanguage } from "@/lib/native-language";
 import { planHasAiFeedback } from "@/lib/plans";
 import { attachWritingFeedback, useAppState } from "@/lib/store";
 import type { WritingFeedback } from "@/lib/types";
 import { countWords } from "@/lib/writing-checks";
+import { FixYourself, textLang } from "./FixYourself";
 
 class RequestError extends Error {
   constructor(
@@ -25,7 +27,7 @@ const requests = new Map<string, Promise<WritingFeedback>>();
 // When each request started, so the progress bar keeps its place when the view remounts.
 const startedAt = new Map<string, number>();
 
-function requestFeedback(key: string, taskId: string, text: string): Promise<WritingFeedback> {
+function requestFeedback(key: string, taskId: string, text: string, lang: string): Promise<WritingFeedback> {
   let request = requests.get(key);
   if (!request) {
     startedAt.set(key, Date.now());
@@ -35,7 +37,7 @@ function requestFeedback(key: string, taskId: string, text: string): Promise<Wri
         res = await fetch("/api/writing-feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId, text }),
+          body: JSON.stringify({ taskId, text, lang }),
         });
       } catch {
         throw new RequestError("Fikk ikke kontakt med serveren. Sjekk nettet og prøv igjen.", true);
@@ -68,6 +70,7 @@ export function AiFeedback({
   trial?: boolean;
 }) {
   const { plan, loading, dev } = useAccess();
+  const [lang] = useNativeLanguage();
   const saved = useAppState().writing.find((w) => submissionId && w.id === submissionId)?.feedback;
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [round, setRound] = useState(0);
@@ -80,7 +83,7 @@ export function AiFeedback({
   useEffect(() => {
     if (!wanted) return;
     let cancelled = false;
-    requestFeedback(key, task.id, text).then(
+    requestFeedback(key, task.id, text, lang).then(
       (feedback) => {
         if (submissionId) attachWritingFeedback(submissionId, feedback);
         if (!cancelled) setOutcome({ feedback });
@@ -97,10 +100,10 @@ export function AiFeedback({
     return () => {
       cancelled = true;
     };
-  }, [wanted, key, task.id, text, submissionId, round]);
+  }, [wanted, key, task.id, text, submissionId, round, lang]);
 
   const feedback = saved ?? (outcome && "feedback" in outcome ? outcome.feedback : undefined);
-  if (feedback) return <FeedbackView task={task} text={text} feedback={feedback} />;
+  if (feedback) return <FeedbackView task={task} text={text} feedback={feedback} submissionId={submissionId} />;
   if (trial || (!loading && !allowed)) return <Upsell trial={trial} />;
   if (!enough) {
     return (
@@ -246,9 +249,23 @@ function LevelChip({ level }: { level: string }) {
   );
 }
 
-function FeedbackView({ task, text, feedback }: { task: WritingTask; text: string; feedback: WritingFeedback }) {
+function FeedbackView({
+  task,
+  text,
+  feedback,
+  submissionId,
+}: {
+  task: WritingTask;
+  text: string;
+  feedback: WritingFeedback;
+  submissionId?: string;
+}) {
   const errors = locateErrors(text, feedback.errors);
   const enoughForTask = rank(feedback.level_estimate) >= rank(task.level);
+  const own = textLang(feedback.lang);
+  const [fixing, setFixing] = useState(false);
+  const revision = useAppState().writing.find((w) => w.id === submissionId)?.revision;
+  const fixedCount = revision?.check.results.filter((r) => r.fixed).length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -266,13 +283,15 @@ function FeedbackView({ task, text, feedback }: { task: WritingTask; text: strin
             </div>
             <p className="text-sm text-granite sm:text-center">Nivået teksten viser</p>
           </div>
-          <div>
+          <div className="flex-1">
             <p className={`font-semibold ${enoughForTask ? "text-moss" : "text-warn"}`}>
               {enoughForTask
                 ? `Teksten holder nivået for oppgaven (${task.level}).`
                 : `Teksten er under nivået for oppgaven (${task.level}).`}
             </p>
-            <p className="mt-2 leading-relaxed">{feedback.summary}</p>
+            <p {...own} className="mt-2 leading-relaxed">
+              {feedback.summary}
+            </p>
           </div>
         </div>
         <ul className="mt-6 divide-y divide-ice border-t border-ice">
@@ -282,18 +301,55 @@ function FeedbackView({ task, text, feedback }: { task: WritingTask; text: strin
               <span>
                 <LevelChip level={c.level} />
               </span>
-              <span className="text-sm leading-relaxed text-granite">{c.comment}</span>
+              <span {...own} className="text-sm leading-relaxed text-granite">
+                {c.comment}
+              </span>
             </li>
           ))}
         </ul>
       </section>
 
-      <ErrorsSection text={text} errors={errors} />
+      {fixing ? (
+        <FixYourself
+          task={task}
+          text={text}
+          errors={errors}
+          submissionId={submissionId}
+          explanationLang={feedback.lang}
+          onClose={() => setFixing(false)}
+        />
+      ) : (
+        <>
+          {errors.length > 0 && (
+            <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-tint p-5 ring-1 ring-ice sm:p-6">
+              <div className="max-w-xl">
+                <h2 className="font-semibold">
+                  {revision ? `Du har rettet ${fixedCount} av ${errors.length} feil selv` : "Prøv å rette feilene selv først"}
+                </h2>
+                <p className="mt-1 text-sm text-granite">
+                  {revision
+                    ? "Fortsett der du slapp, eller se løsningene under."
+                    : "Du lærer mest av å finne løsningen selv. Rett teksten, så sjekker AI-sensoren rettingene dine."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFixing(true)}
+                className="rounded-md bg-ink px-5 py-2.5 font-medium text-snow transition-colors hover:bg-fjord"
+              >
+                {revision ? "Fortsett å rette" : "Rett feilene selv"}
+              </button>
+            </section>
+          )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <ListCard title="Dette gjør du bra" items={feedback.strengths} tone="moss" />
-        <ListCard title="Øv på dette" items={feedback.tips} tone="rorbu" />
-      </div>
+          <ErrorsSection text={text} errors={errors} explanationLang={feedback.lang} />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <ListCard title="Dette gjør du bra" items={feedback.strengths} tone="moss" explanationLang={feedback.lang} />
+            <ListCard title="Øv på dette" items={feedback.tips} tone="rorbu" explanationLang={feedback.lang} />
+          </div>
+        </>
+      )}
 
       <details className="group rounded-2xl bg-surface p-6 ring-1 ring-ice sm:p-7">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xl font-semibold">
@@ -308,7 +364,15 @@ function FeedbackView({ task, text, feedback }: { task: WritingTask; text: strin
   );
 }
 
-function ErrorsSection({ text, errors }: { text: string; errors: LocatedError[] }) {
+function ErrorsSection({
+  text,
+  errors,
+  explanationLang,
+}: {
+  text: string;
+  errors: LocatedError[];
+  explanationLang?: string;
+}) {
   if (errors.length === 0) {
     return (
       <section className="rounded-2xl bg-surface p-6 ring-1 ring-ice sm:p-7">
@@ -385,7 +449,9 @@ function ErrorsSection({ text, errors }: { text: string; errors: LocatedError[] 
                 </p>
                 <span className="rounded-md bg-tint px-2 py-0.5 text-xs font-medium text-granite">{topicName(e.topic)}</span>
               </div>
-              <p className="mt-1.5 text-sm leading-relaxed text-granite">{e.explanation}</p>
+              <p {...textLang(explanationLang)} className="mt-1.5 text-sm leading-relaxed text-granite">
+                {e.explanation}
+              </p>
             </div>
           </li>
         ))}
@@ -394,7 +460,17 @@ function ErrorsSection({ text, errors }: { text: string; errors: LocatedError[] 
   );
 }
 
-function ListCard({ title, items, tone }: { title: string; items: string[]; tone: "moss" | "rorbu" }) {
+function ListCard({
+  title,
+  items,
+  tone,
+  explanationLang,
+}: {
+  title: string;
+  items: string[];
+  tone: "moss" | "rorbu";
+  explanationLang?: string;
+}) {
   if (items.length === 0) return null;
   return (
     <section className="rounded-2xl bg-surface p-6 ring-1 ring-ice">
@@ -406,7 +482,7 @@ function ListCard({ title, items, tone }: { title: string; items: string[]; tone
               aria-hidden="true"
               className={`mt-2 size-2 shrink-0 rounded-full ${tone === "moss" ? "bg-moss" : "bg-rorbu"}`}
             />
-            {item}
+            <span {...textLang(explanationLang)}>{item}</span>
           </li>
         ))}
       </ul>
