@@ -39,6 +39,12 @@ export function ensureSchema(): Promise<void> {
         output_tokens bigint NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, day)
       )`,
+    db`
+      CREATE TABLE IF NOT EXISTS ai_cache (
+        key        text PRIMARY KEY,
+        value      jsonb NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
   ])
     .then(() => undefined)
     .catch((err: unknown) => {

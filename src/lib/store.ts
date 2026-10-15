@@ -8,6 +8,7 @@ import type {
   Profile,
   Skill,
   SpeakingSubmission,
+  SavedWord,
   SrsState,
   WritingFeedback,
   WritingSubmission,
@@ -180,6 +181,23 @@ export function addSpeaking(sub: Omit<SpeakingSubmission, "id" | "at">): string 
   return id;
 }
 
+/** Saves a word to practise; a word already saved keeps its place and review history. */
+export function saveWord(word: SavedWord) {
+  update((s) => {
+    const words = s.words ?? [];
+    if (words.some((w) => w.id === word.id)) return s;
+    return { ...s, words: [word, ...words] };
+  });
+}
+
+export function removeWord(id: string) {
+  update((s) => {
+    const srs = { ...s.srs };
+    delete srs[id];
+    return { ...s, srs, words: (s.words ?? []).filter((w) => w.id !== id) };
+  });
+}
+
 export function reviewCard(cardId: string, next: SrsState) {
   update((s) => markActive({ ...s, srs: { ...s.srs, [cardId]: next } }, 2));
 }
@@ -259,6 +277,7 @@ export function mergeStates(local: AppState, remote: AppState): AppState {
     writing: writing.reverse(),
     speaking: union(local.speaking, remote.speaking ?? []).reverse(),
     srs,
+    words: union(local.words ?? [], remote.words ?? []).reverse(),
     grammarErrors,
     xp: Math.max(local.xp, remote.xp ?? 0),
     activeDays: [...new Set([...local.activeDays, ...(remote.activeDays ?? [])])].sort(),

@@ -5,7 +5,8 @@ import { releaseCheck, recordTokens, reserveCheck, USER_DAILY_LIMIT } from "@/li
 import { authEnabled } from "@/lib/auth-config";
 import { planHasAiFeedback } from "@/lib/plans";
 import { activePlan } from "@/lib/subscription";
-import { assessWriting, FeedbackRefused } from "@/lib/writing-ai";
+import { Refused } from "@/lib/claude";
+import { assessWriting } from "@/lib/writing-ai";
 import { countWords } from "@/lib/writing-checks";
 
 // Claude takes 15–30 s; one retry after a timeout has to fit too.
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
   } catch (err) {
     // Only a check that cost nothing is given back; otherwise failing answers could be repeated for free.
     if (userId && notBilled(err)) await releaseCheck(userId).catch(() => undefined);
-    if (err instanceof FeedbackRefused) {
+    if (err instanceof Refused) {
       return fail("AI-sensoren kunne ikke vurdere denne teksten. Endre teksten litt og prøv igjen.", 422);
     }
     if (

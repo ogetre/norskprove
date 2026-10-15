@@ -6,6 +6,7 @@ import { audioKey, castVoices, effectFor, LEVEL_RATE, speakerOrder, type Cast, t
 import { useHydrated } from "@/lib/store";
 import { useNorwegianVoices } from "@/lib/tts";
 import type { ListeningTask, SpeakerId } from "@/lib/types";
+import { InteractiveText } from "./words/InteractiveText";
 
 /** Recorded tasks (npm run audio): task id → version of the text the recording was made from. */
 const recordings = (audio as { tasks: Record<string, string> }).tasks;
@@ -373,18 +374,35 @@ export function ListeningPlayer({
       {transcriptVisible && (
         <div className="mt-5 rounded-lg bg-surface p-2 text-[15px] leading-relaxed text-ink">
           {task.lines.map((l, i) => {
+            const speaker = several && <span className="font-semibold">{task.speakers[l.speaker]}: </span>;
             const text = (
               <>
-                {several && <span className="font-semibold">{task.speakers[l.speaker]}: </span>}
+                {speaker}
                 {l.text}
               </>
             );
             const cls = `block w-full rounded-md px-2 py-1 text-left ${line === i ? "bg-ice" : ""}`;
-            // Outside a test, tapping a line plays just that line.
-            return !limit && canPlay ? (
-              <button key={i} type="button" disabled={playing} onClick={() => void start(i, true)} className={`${cls} hover:bg-ice/60`}>
-                {text}
-              </button>
+            // Outside a test the words can be tapped, and a button plays just that line.
+            return !limit ? (
+              <div key={i} className={`flex items-start gap-2 ${cls}`}>
+                {canPlay && (
+                  <button
+                    type="button"
+                    disabled={playing}
+                    onClick={() => void start(i, true)}
+                    aria-label={`Spill av replikk ${i + 1}`}
+                    className="mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-fjord ring-1 ring-ice transition-colors hover:bg-ice disabled:opacity-40"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                      <path d="M2.5 1.5v7l6-3.5z" fill="currentColor" />
+                    </svg>
+                  </button>
+                )}
+                <p className="min-w-0 flex-1">
+                  {speaker}
+                  <InteractiveText text={l.text} taskId={task.id} block={i} />
+                </p>
+              </div>
             ) : (
               <p key={i} className={cls}>
                 {text}
