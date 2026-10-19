@@ -6,6 +6,8 @@
  *   npm run audio:check -- --voices=gemini-2.5-pro-tts           report only
  *   npm run audio:check -- --voices=gemini-2.5-pro-tts --fix     records failed lines again, up to 3 times
  *   npm run audio:check -- --voices=gemini-2.5-pro-tts --only=pa-kafeen,hos-legen
+ *   --strict   a line passes only when two checks in a row agree; one check now and then
+ *              misses a small slip, so use it for retakes and the final pass
  *
  * --voices must be the voices the tasks were recorded with (audio.json), so retakes match.
  * Needs a service account (GOOGLE_SA_JSON or GOOGLE_APPLICATION_CREDENTIALS) with Vertex AI User.
@@ -30,6 +32,7 @@ const RETAKES = 3;
 const args = process.argv.slice(2);
 const fix = args.includes("--fix");
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length).split(",");
+const strict = args.includes("--strict");
 
 type Verdict = { ok: boolean; heard: string; problem: string };
 
@@ -42,6 +45,7 @@ async function check(file: string, script: string): Promise<Verdict> {
   const url = `https://aiplatform.googleapis.com/v1/projects/${await projectId()}/locations/global/publishers/google/models/${MODEL}:generateContent`;
   const audio = (await readFile(file)).toString("base64");
   for (let attempt = 1; ; attempt++) {
+    // A dropped connection is retried like a busy server.
     const res = await fetch(url, {
       method: "POST",
       headers: { Authorization: `Bearer ${await accessToken()}`, "Content-Type": "application/json" },
@@ -57,8 +61,11 @@ async function check(file: string, script: string): Promise<Verdict> {
           },
         },
       }),
+    }).catch((err: unknown) => {
+      if (attempt < 6) return null;
+      throw err;
     });
-    if ((res.status === 429 || res.status >= 500) && attempt < 6) {
+    if (!res || ((res.status === 429 || res.status >= 500) && attempt < 6)) {
       await new Promise((r) => setTimeout(r, Math.min(60_000, 2000 * 2 ** attempt)));
       continue;
     }
@@ -67,6 +74,12 @@ async function check(file: string, script: string): Promise<Verdict> {
     if (!text) throw new Error(`Vertex AI answered ${res.status}: ${data.error?.message ?? "no text"}`);
     return JSON.parse(text) as Verdict;
   }
+}
+
+/** One verdict, or two in a row with --strict; the first failure is returned. */
+async function verify(file: string, script: string): Promise<Verdict> {
+  const first = await check(file, script);
+  return first.ok && strict ? check(file, script) : first;
 }
 
 async function main() {
@@ -90,12 +103,12 @@ async function main() {
     while (next < items.length) {
       const { task, i, file } = items[next++];
       const script = task.lines[i].text;
-      let verdict = await check(file, script);
+      let verdict = await verify(file, script);
       for (let take = 1; !verdict.ok && fix && take <= RETAKES; take++) {
         const p = plan(task, pools!)[i];
         await writeFile(file, await synthesize(p));
         await addUsage(p.text.length);
-        verdict = await check(file, script);
+        verdict = await verify(file, script);
         if (verdict.ok) fixed++;
       }
       if (!verdict.ok) failed.push({ line: `${task.id}#${i}`, script, heard: verdict.heard, problem: verdict.problem });
