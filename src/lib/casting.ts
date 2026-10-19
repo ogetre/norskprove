@@ -5,8 +5,8 @@ import type { Level, ListeningTask, SpeakerId, VoiceGender } from "./types";
  * tasks (scripts/generate-audio.ts) and by the player, so a recording always matches its text.
  */
 
-/** Speaking speed per level, like the exam: slow and clear at A1, natural at B2. */
-export const LEVEL_RATE: Record<Level, number> = { A1: 0.85, A2: 0.92, B1: 0.98, B2: 1.03 };
+/** Speaking speed per level: slow and clear at A1, everyday speed at B2, as in the exam. */
+export const LEVEL_RATE: Record<Level, number> = { A1: 0.85, A2: 0.92, B1: 1.02, B2: 1.1 };
 
 const FEMALE = new Set(
   "Aisha Ana Anna Anne Bente Camilla Daria Elena Elif Elin Ella Eva Ewa Fatima Grete Gro Gunn Gunvor Halima Hanne Heidi Hilde Ida Ingrid Iselin Kari Kristin Leila Lena Lene Leyla Lina Linda Linn Lisa Lise Maja Mari Marianne Marit Marte Mei Mia Mina Mona Monika Nina Nora Nour Olga Petra Rita Sara Siri Sofie Sunniva Tone Trine Turid Zainab".split(" "),
