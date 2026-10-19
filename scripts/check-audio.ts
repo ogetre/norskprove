@@ -34,14 +34,14 @@ const fix = args.includes("--fix");
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length).split(",");
 const strict = args.includes("--strict");
 
-type Verdict = { ok: boolean; heard: string; problem: string };
+export type Verdict = { ok: boolean; heard: string; problem: string };
 
 const prompt = (script: string) => `This is a recording of one line from a Norwegian listening exercise. The script for the line is:
 "${script}"
 
 Write what is said in "heard". Set "ok" to false if the recording leaves out or changes words, repeats a part, or says anything that is not in the script, such as English instructions or notes about the scene or the speaker. Ignore punctuation, whether numbers are said as digits or words, spelling variants that bokmål allows, and small natural fillers like "eh", "å" or "åh". In "problem", say briefly what is wrong, or leave it empty.`;
 
-async function check(file: string, script: string): Promise<Verdict> {
+export async function check(file: string, script: string): Promise<Verdict> {
   const url = `https://aiplatform.googleapis.com/v1/projects/${await projectId()}/locations/global/publishers/google/models/${MODEL}:generateContent`;
   const audio = (await readFile(file)).toString("base64");
   for (let attempt = 1; ; attempt++) {
@@ -122,7 +122,9 @@ async function main() {
   for (const f of failed) console.log(`- ${f.line}: ${f.problem}`);
 }
 
-main().catch((err: unknown) => {
-  console.error(err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+if (process.argv[1]?.endsWith("check-audio.ts")) {
+  main().catch((err: unknown) => {
+    console.error(err instanceof Error ? err.message : err);
+    process.exit(1);
+  });
+}

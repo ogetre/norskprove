@@ -1275,7 +1275,7 @@ export const listeningB2: ListeningTask[] = [
       },
       {
         kind: "choice",
-        prompt: "Hva er kritiker 2s viktigste innvending?",
+        prompt: "Hva er den viktigste innvendingen til kritiker 2?",
         options: ["Boka mangler driv i handlingen", "Naturbeskrivelsene er for korte", "Språket er for enkelt"],
         answer: 0,
         explanation: "Kritiker 2 sier: «jeg savner driv i handlingen».",
