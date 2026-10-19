@@ -48,3 +48,4 @@ next-env.d.ts
 
 # Voice previews from npm run audio -- --preview
 .audio-preview/
+.audio-check.json

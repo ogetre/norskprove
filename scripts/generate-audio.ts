@@ -5,6 +5,7 @@
  *   npm run audio                records new and changed tasks
  *   npm run audio -- --force     records every task again
  *   npm run audio -- --only=pa-kafeen,hos-legen
+ *   npm run audio -- --parallel=6     lines recorded at once (default 4, or 2 for Gemini voices)
  *
  * Needs GOOGLE_TTS_API_KEY in .env.local. Each line becomes its own MP3 in
  * public/audio/lytting/<task>/, and src/content/listening/audio.json lists the recorded tasks,
@@ -56,7 +57,7 @@ const force = args.includes("--force");
 const allowMore = args.includes("--allow-more");
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length).split(",");
 /** Voice family to use. Chirp 3 HD is free up to 1 million characters a month. */
-const family = args.find((a) => a.startsWith("--voices="))?.slice("--voices=".length) ?? "Chirp3-HD";
+export const family = args.find((a) => a.startsWith("--voices="))?.slice("--voices=".length) ?? "Chirp3-HD";
 /** Gemini voices act each line from a director's note. */
 const gemini = family.startsWith("gemini");
 /** Chirp and Gemini voices don't take a pitch, but they have so many voices that no task needs one. */
@@ -96,6 +97,13 @@ async function authHeaders(): Promise<Record<string, string>> {
 type Usage = Record<string, Record<string, number>>;
 const month = new Date().toISOString().slice(0, 7);
 
+/** Adds characters sent outside a recording run (retakes) to this month's count. */
+export async function addUsage(chars: number) {
+  const usage = await readUsage();
+  usage[month] = { ...usage[month], [family]: (usage[month]?.[family] ?? 0) + chars };
+  await writeFile(USAGE, JSON.stringify(usage, null, 2) + "\n");
+}
+
 async function readUsage(): Promise<Usage> {
   try {
     return JSON.parse(await readFile(USAGE, "utf8")) as Usage;
@@ -117,7 +125,7 @@ async function call<T>(url: string, init?: RequestInit, tries = 6): Promise<T> {
   }
 }
 
-async function voicePools(): Promise<Pools> {
+export async function voicePools(): Promise<Pools> {
   type Voice = { name: string; ssmlGender: string; languageCodes: string[] };
   const { voices } = await call<{ voices: Voice[] }>(`${API}/voices?languageCode=nb-NO`, { headers: await authHeaders() });
   // Gemini voices have the same names as Chirp 3 HD's, without the prefix: «Kore», «Puck».
@@ -179,7 +187,7 @@ export function direction(task: ListeningTask, speaker: ListeningTask["lines"][n
 }
 
 /** The Google voice, pitch and speed for each line of a task. */
-function plan(task: ListeningTask, pools: Pools) {
+export function plan(task: ListeningTask, pools: Pools) {
   const cast = castVoices(task);
   return task.lines.map((line) => {
     const c = cast[line.speaker]!;
@@ -198,7 +206,7 @@ function plan(task: ListeningTask, pools: Pools) {
   });
 }
 
-async function synthesize(p: ReturnType<typeof plan>[number]): Promise<Buffer> {
+export async function synthesize(p: ReturnType<typeof plan>[number]): Promise<Buffer> {
   const body = gemini
     ? {
         // Gemini sets the pace from the note, so no speaking rate.
@@ -303,8 +311,8 @@ async function main() {
     manifest.voices = family;
   }
 
-  // Gemini voices have a lower rate limit than Chirp.
-  const perBatch = gemini ? 2 : 4;
+  // Lines recorded at once. Gemini answers slowly but has a lower rate limit; 429s are retried.
+  const perBatch = Number(args.find((a) => a.startsWith("--parallel="))?.slice("--parallel=".length)) || (gemini ? 2 : 4);
   let done = 0;
   for (const task of todo) {
     const key36 = audioKey(task);

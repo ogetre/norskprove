@@ -10,6 +10,8 @@ import { InteractiveText } from "./words/InteractiveText";
 
 /** Recorded tasks (npm run audio): task id → version of the text the recording was made from. */
 const recordings = (audio as { tasks: Record<string, string> }).tasks;
+/** The voices the recordings were made with; part of the URL so a browser never plays a cached older voice. */
+const recordedWith = encodeURIComponent((audio as { voices: string | null }).voices ?? "");
 
 /** Playback speeds offered when practising. Tests always play at the exam speed. */
 const SPEEDS = [0.75, 1, 1.25];
@@ -196,7 +198,7 @@ export function ListeningPlayer({
       if (sound.current === undefined) sound.current = connectEffects(el);
       void sound.current?.ctx.resume();
       sound.current?.route(effectFor(task, task.lines[i].speaker));
-      el.src = `/audio/lytting/${task.id}/${version}-${i}.mp3`;
+      el.src = `/audio/lytting/${task.id}/${version}-${i}.mp3?v=${recordedWith}`;
       el.defaultPlaybackRate = speedRef.current;
       el.playbackRate = speedRef.current;
       const done = () => {
