@@ -146,8 +146,9 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
       <div>
         <h1 className="font-display text-3xl font-medium tracking-tight sm:text-4xl">Full delprøve i skriving</h1>
         <p className="mt-3 max-w-2xl leading-relaxed text-granite">
-          Som på prøven melder du deg på et nivå. Du skriver flere tekster med én felles tidtaker, uten
-          stavekontroll. Til slutt får du automatisk sjekk og eksempeltekster.
+          Som på prøven melder du deg på et nivå, og du kan ikke få et høyere resultat enn det høyeste nivået
+          du velger. Velg derfor det nivået du tror du er på. Du skriver uten stavekontroll og ordbok, med én
+          felles tidtaker. Til slutt får du automatisk sjekk og eksempeltekster.
         </p>
         <ul className="mt-8 grid gap-4 md:grid-cols-3">
           {bands.map((b) => (
@@ -316,6 +317,11 @@ export function WritingExam({ bands: pools }: { bands: BandPools[] }) {
                 </li>
               ))}
             </ul>
+            {texts.some((t) => countWords(t) === 0) && (
+              <p className="mt-3 text-sm leading-relaxed text-rorbu">
+                Du har ikke skrevet noe på alle oppgavene. På prøven må du svare på alle for å få et resultat.
+              </p>
+            )}
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={() => setConfirm(false)} className="rounded-md px-4 py-2.5 font-medium text-granite hover:text-ink">
                 Avbryt
