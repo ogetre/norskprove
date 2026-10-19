@@ -39,7 +39,7 @@ import path from "node:path";
 import { listeningTasks } from "../src/content/listening";
 import { audioKey, castVoices, effectFor, LEVEL_RATE } from "../src/lib/casting";
 import type { ListeningTask, VoiceGender } from "../src/lib/types";
-import { accessToken } from "./google-auth";
+import { accessToken } from "../src/lib/google-auth";
 
 const API = "https://texttospeech.googleapis.com/v1";
 const ROOT = path.resolve(__dirname, "..");

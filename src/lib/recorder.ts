@@ -65,7 +65,8 @@ export function useRecorder() {
     }
 
     const chunks: Blob[] = [];
-    const rec = new MediaRecorder(stream.current);
+    // Speech needs little: at 32 kbit/s a whole task of answers can be sent to the AI examiner at once.
+    const rec = new MediaRecorder(stream.current, { audioBitsPerSecond: 32_000 });
     rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
     rec.onstop = () => {
       const seconds = Math.round((Date.now() - startedAt.current) / 1000);

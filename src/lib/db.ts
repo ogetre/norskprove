@@ -39,6 +39,18 @@ export function ensureSchema(): Promise<void> {
         output_tokens bigint NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, day)
       )`,
+    // One AI check of the oral test (see oral-checks), with the calls made for it and their cost.
+    db`
+      CREATE TABLE IF NOT EXISTS oral_checks (
+        id         text PRIMARY KEY,
+        user_id    text NOT NULL,
+        task_ids   text[] NOT NULL,
+        free       boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        answers    integer NOT NULL DEFAULT 0,
+        grades     integer NOT NULL DEFAULT 0,
+        cost_usd   numeric NOT NULL DEFAULT 0
+      )`.then(() => db`CREATE INDEX IF NOT EXISTS oral_checks_user ON oral_checks (user_id, created_at)`),
     db`
       CREATE TABLE IF NOT EXISTS ai_cache (
         key        text PRIMARY KEY,

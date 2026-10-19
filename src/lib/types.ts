@@ -180,7 +180,7 @@ export interface Attempt {
   result?: Level | "under A1";
   /** Place on the results chart's level scale (0 under A1 … 5 top of B2), when the test knows it. */
   scale?: number;
-  /** The written text this attempt was for. */
+  /** The written text or spoken answers this attempt was for. */
   submissionId?: string;
 }
 
@@ -231,6 +231,10 @@ export interface SpeakingFeedback {
   model_answer: string;
   /** Language of the explanations when not Norwegian (A1–A2 learners). */
   lang?: string;
+  /** Graded from the recordings (Gemini), so pronunciation is assessed too. */
+  heard?: boolean;
+  /** How understandable the candidate is, and words that were hard to understand. */
+  pronunciation?: { comment: string; words: { word: string; heard: string; tip: string }[] };
 }
 
 /** One question from the examiner and what the candidate answered. */

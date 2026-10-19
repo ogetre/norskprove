@@ -92,7 +92,7 @@ export function Paywall({ children, skill, feature }: { children: ReactNode; ski
         </h2>
         <p className="mt-3 leading-relaxed text-mist">
           {needsUpgrade
-            ? `Abonnementet ditt (${planName(plan)}) gjelder lesing og lytting. Bytt til Pluss eller Premium for å øve på alle fire delene.`
+            ? `Abonnementet ditt (${planName(plan)}) gjelder lesing, lytting og muntlig. Bytt til Pluss eller Premium for å øve på alle fire delene.`
             : "Velg et abonnement for å få tilgang til alle oppgavene, fulle delprøver og statistikken din. Du kan avslutte når du vil."}
         </p>
         <div className="mt-7 flex flex-wrap gap-3">

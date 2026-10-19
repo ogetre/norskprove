@@ -4,7 +4,7 @@ export type PlanId = "start" | "pluss" | "premium";
 
 /** Which parts of the exam each plan unlocks. */
 export const PLAN_SKILLS: Record<PlanId, Skill[]> = {
-  start: ["lesing", "lytting"],
+  start: ["lesing", "lytting", "muntlig"],
   pluss: ["lesing", "lytting", "skriving", "muntlig"],
   premium: ["lesing", "lytting", "skriving", "muntlig"],
 };
@@ -17,6 +17,16 @@ export function planCovers(plan: PlanId | null, skill: Skill): boolean {
 export function planHasAiFeedback(plan: PlanId | null): boolean {
   return plan === "premium";
 }
+
+/**
+ * AI checks of the oral test a month in each plan (an oral test or a practice task each); null
+ * is no limit. Without a plan, every signed-in learner can have one oral test checked for free.
+ */
+export const PLAN_ORAL_CHECKS: Record<PlanId, number | null> = { start: 3, pluss: 10, premium: null };
+export const FREE_ORAL_CHECKS = 1;
+
+/** How many oral checks the learner has; `limit` and `left` are null for no limit. */
+export type OralAllowance = { limit: number | null; used: number; left: number | null; free: boolean };
 
 export interface Plan {
   id: PlanId;
@@ -33,9 +43,10 @@ export const PLANS: Plan[] = [
     id: "start",
     name: "Start",
     price: 129,
-    tagline: "For deg som vil trene lesing og lytting.",
+    tagline: "For deg som vil trene lesing, lytting og muntlig.",
     features: [
       "Lesing og lytting: alle oppgavetyper",
+      "Muntlig med sensor som snakker, og AI-vurdering av 3 prøver i måneden",
       "Fulle delprøver med tidtaker",
       "Statistikk og nivå per delprøve",
     ],
@@ -49,7 +60,7 @@ export const PLANS: Plan[] = [
     features: [
       "Alt i Start",
       "Skriving: oppgaver på alle nivåer, sjekk av kravene og eksempeltekster",
-      "Muntlig: sensor som snakker, opptak av svarene dine og eksempelsvar",
+      "Muntlig: AI-vurdering av 10 prøver i måneden, også av uttalen",
       "Fulle delprøver i alle fire delene",
     ],
   },
@@ -61,7 +72,7 @@ export const PLANS: Plan[] = [
     features: [
       "Alt i Pluss",
       "AI-tilbakemelding på skriving: feil, rettelser og nivå",
-      "AI-tilbakemelding på muntlig (kommer snart)",
+      "Ubegrenset AI-vurdering av muntlig, også av uttalen",
       "Rapport med det du bør øve mest på",
       "Nye oppgaver hver måned",
     ],
