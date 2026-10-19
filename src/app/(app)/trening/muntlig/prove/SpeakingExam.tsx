@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ResumeCard } from "@/components/ResumeCard";
 import { SpeakingSession, type SessionProgress } from "@/components/speaking/SpeakingSession";
-import { SPEAKING_KIND_NAMES, type SpeakingTask } from "@/content/speaking";
+import type { SpeakingTask } from "@/content/speaking";
 import { shuffle } from "@/lib/random";
 import { scriptedCount } from "@/lib/speaking-checks";
 import { clearUnfinished, loadUnfinished, saveUnfinished, savedAtLabel } from "@/lib/unfinished";
 
-type Band = { id: string; label: string; tasks: SpeakingTask[] };
-type BandPools = { id: string; label: string; pools: SpeakingTask[][] };
+type Band = { id: string; label: string; parts: string[]; tasks: SpeakingTask[] };
+/** A level band: the name of each part as at Norskprøven, and the prompts each part can draw from. */
+type BandPools = { id: string; label: string; parts: string[]; pools: SpeakingTask[][] };
 type Saved = SessionProgress & { band: { id: string; label: string; tasks: string[] }; savedAt: string };
 
 /** The saved test with its prompts, or null if it is missing, finished or no longer fits the prompts. */
@@ -20,13 +21,14 @@ function restore(saved: Saved | null, pools: BandPools[]): (Saved & { exam: Band
   const tasks = saved.band.tasks.map((id) => byId.get(id)).filter((t): t is SpeakingTask => t !== undefined);
   if (tasks.length !== saved.band.tasks.length || saved.answers.length !== tasks.length) return null;
   if (tasks.every((t, i) => scriptedCount(saved.answers[i]) >= t.questions.length)) return null;
-  return { ...saved, exam: { id: saved.band.id, label: saved.band.label, tasks } };
+  const parts = pools.find((b) => b.id === saved.band.id)?.parts ?? tasks.map((t) => t.title);
+  return { ...saved, exam: { id: saved.band.id, label: saved.band.label, parts, tasks } };
 }
 
 export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
   // A new prompt per part each visit. Paywall mounts this on the client only, so the draw
   // never has to match a server render.
-  const [bands] = useState<Band[]>(() => pools.map(({ pools: parts, ...b }) => ({ ...b, tasks: parts.map((p) => shuffle(p)[0]) })));
+  const [bands] = useState<Band[]>(() => pools.map(({ pools: slots, ...b }) => ({ ...b, tasks: slots.map((p) => shuffle(p)[0]) })));
   const [band, setBand] = useState<Band | null>(null);
   const [saved, setSaved] = useState(() => restore(loadUnfinished<Saved>("muntlig"), pools));
   const [resume, setResume] = useState<SessionProgress | undefined>(undefined);
@@ -93,8 +95,10 @@ export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
     <div>
       <h1 className="font-display text-3xl font-medium tracking-tight sm:text-4xl">Muntlig prøve</h1>
       <p className="mt-3 max-w-2xl leading-relaxed text-granite">
-        Velg nivå som når du melder deg på prøven. Sensoren stiller spørsmål med stemme, og du svarer i
-        mikrofonen. Nettleseren spør om lov til å bruke mikrofonen første gang.
+        Velg nivå som når du melder deg på prøven. Prøven begynner alltid med at du forteller kort om deg
+        selv. På prøven snakker dere to kandidater sammen i noen av oppgavene; her er AI-sensoren den du
+        snakker med. Sensoren stiller spørsmål med stemme, og du svarer i mikrofonen. Nettleseren spør om
+        lov til å bruke mikrofonen første gang.
       </p>
       <ul className="mt-8 grid gap-4 md:grid-cols-3">
         {bands.map((b) => (
@@ -111,7 +115,11 @@ export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
               <ol className="mt-4 space-y-1.5 text-sm">
                 {b.tasks.map((t, i) => (
                   <li key={t.id}>
-                    <span className="text-granite">{i + 1}. {SPEAKING_KIND_NAMES[t.kind]}:</span> {t.title}
+                    <span className="text-granite">
+                      {i + 1}. {b.parts[i]}
+                      {t.title !== b.parts[i] && ":"}
+                    </span>
+                    {t.title !== b.parts[i] && ` ${t.title}`}
                   </li>
                 ))}
               </ol>

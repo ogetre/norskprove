@@ -9,7 +9,8 @@
     "lint": "eslint",
     "audio": "tsx scripts/generate-audio.ts",
     "audio:check": "tsx scripts/check-audio.ts",
-    "audio:narration": "tsx scripts/generate-narration.ts"
+    "audio:narration": "tsx scripts/generate-narration.ts",
+    "pictures": "tsx scripts/generate-pictures.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

@@ -3,12 +3,15 @@ import { speakingA1 } from "./a1";
 import { speakingA2 } from "./a2";
 import { speakingB1 } from "./b1";
 import { speakingB2 } from "./b2";
+import { examTasks } from "./proven";
 import { byLevel } from "../order";
 
-export type SpeakingKind = "presentasjon" | "samtale" | "mening";
+export type SpeakingKind = "om-deg-selv" | "presentasjon" | "bilde" | "samtale" | "mening";
 
 export const SPEAKING_KIND_NAMES: Record<SpeakingKind, string> = {
+  "om-deg-selv": "Fortell kort om deg selv",
   presentasjon: "Fortell om noe",
+  bilde: "Beskriv et bilde",
   samtale: "Rollespill",
   mening: "Si hva du mener",
 };
@@ -20,6 +23,8 @@ export interface SpeakingTask {
   kind: SpeakingKind;
   /** The situation, shown before the examiner speaks. */
   intro: string;
+  /** The picture to talk about in a picture task; `alt` says what it shows, also to the AI examiner. */
+  image?: { src: string; alt: string };
   /** What the examiner says, one answer per line. */
   questions: string[];
   prepSeconds: number;
@@ -178,16 +183,21 @@ const baseTasks: SpeakingTask[] = [
   },
 ];
 
-export const speakingTasks: SpeakingTask[] = byLevel([...baseTasks, ...speakingA1, ...speakingA2, ...speakingB1, ...speakingB2]);
+export const speakingTasks: SpeakingTask[] = byLevel([...baseTasks, ...examTasks, ...speakingA1, ...speakingA2, ...speakingB1, ...speakingB2]);
 
 export function getSpeakingTask(id: string) {
   return speakingTasks.find((t) => t.id === id);
 }
 
-/** One part of the oral test: drawn at random from the prompts of this kind and level. */
-export type SpeakingSlot = { level: Level; kind: SpeakingKind };
+/** One part of the oral test, named as at Norskprøven: drawn at random from the prompts of this kind and level. */
+export type SpeakingSlot = { level: Level; kind: SpeakingKind; label: string };
 export type SpeakingBand = { id: string; label: string; slots: SpeakingSlot[] };
 
+/**
+ * The oral test as Norskprøven runs it: it always starts with a short presentation, then four
+ * tasks in all at A1–A2 and three at A2–B1 and B1–B2. At the test two candidates talk together in
+ * the pair tasks; here the AI examiner is the other side of the conversation.
+ */
 export const speakingTests = {
   trial: "om-deg-selv",
   bands: [
@@ -195,27 +205,28 @@ export const speakingTests = {
       id: "a1-a2",
       label: "A1–A2",
       slots: [
-        { level: "A1", kind: "presentasjon" },
-        { level: "A1", kind: "samtale" },
-        { level: "A2", kind: "mening" },
+        { level: "A1", kind: "om-deg-selv", label: "Fortell kort om deg selv" },
+        { level: "A1", kind: "bilde", label: "Beskriv et bilde" },
+        { level: "A2", kind: "presentasjon", label: "Samtale om et tema" },
+        { level: "A2", kind: "mening", label: "Si hva du mener" },
       ],
     },
     {
       id: "a2-b1",
       label: "A2–B1",
       slots: [
-        { level: "A2", kind: "presentasjon" },
-        { level: "A2", kind: "samtale" },
-        { level: "B1", kind: "mening" },
+        { level: "A2", kind: "om-deg-selv", label: "Fortell kort om deg selv" },
+        { level: "B1", kind: "bilde", label: "Beskriv et bilde" },
+        { level: "B1", kind: "mening", label: "Si og begrunn meningen din" },
       ],
     },
     {
       id: "b1-b2",
       label: "B1–B2",
       slots: [
-        { level: "B1", kind: "presentasjon" },
-        { level: "B1", kind: "samtale" },
-        { level: "B2", kind: "mening" },
+        { level: "B1", kind: "om-deg-selv", label: "Fortell kort om deg selv" },
+        { level: "B1", kind: "mening", label: "Utveksle synspunkter" },
+        { level: "B2", kind: "mening", label: "Ta stilling til en påstand" },
       ],
     },
   ] satisfies SpeakingBand[],

@@ -30,7 +30,7 @@ export function SpeakingHome({ groups }: { groups: Group[] }) {
         skill="muntlig"
         href="/trening/muntlig/prove"
         title="Muntlig prøve"
-        text="Tre deler etter hverandre, som hos sensoren: fortell om noe, et rollespill og en samtale der du sier hva du mener. Sensoren stiller spørsmålene med stemme, og du svarer i mikrofonen."
+        text="Som den muntlige prøven: du forteller kort om deg selv, beskriver et bilde og sier hva du mener, med fire deler på A1–A2 og tre på A2–B1 og B1–B2. Sensoren stiller spørsmålene med stemme, og du svarer i mikrofonen."
       />
 
       <section className="mt-12" aria-labelledby="speak-title">
