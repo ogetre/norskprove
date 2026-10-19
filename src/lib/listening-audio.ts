@@ -13,6 +13,8 @@ import type { ListeningTask, SpeakerId } from "./types";
 
 /** Recorded tasks (npm run audio): task id → version of the text the recording was made from. */
 const recordings = (audio as { tasks: Record<string, string> }).tasks;
+/** How long each recorded line is, in seconds. */
+const lengths = (audio as { durations?: Record<string, number[]> }).durations ?? {};
 /** The voices the recordings were made with; part of the URL so a browser never plays a cached older voice. */
 const recordedWith = encodeURIComponent((audio as { voices: string | null }).voices ?? "");
 
@@ -33,6 +35,76 @@ export function pauseBefore(task: ListeningTask, i: number): number {
 }
 
 export const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Roughly how many characters a browser voice reads per second at rate 1. */
+const SPEECH_CHARS_PER_SECOND = 14;
+
+/**
+ * Where the playback of a task is, so a progress bar can move with the sound instead of jumping a
+ * step for each line, which looks like the site froze during a long line. The lines' lengths come
+ * from the recordings, or are guessed from the text when the browser's voice reads it.
+ */
+export class Timeline {
+  private readonly lengths: number[];
+  private readonly starts: number[];
+  private readonly total: number;
+  private line = 0;
+  private since = 0;
+  private playing = false;
+  private el: HTMLAudioElement | null = null;
+  private rate = 1;
+
+  constructor(private readonly task: ListeningTask) {
+    const recorded = isRecorded(task) && lengths[task.id]?.length === task.lines.length;
+    const cast = castVoices(task);
+    this.lengths = task.lines.map((l, i) =>
+      recorded ? lengths[task.id][i] : l.text.length / (SPEECH_CHARS_PER_SECOND * LEVEL_RATE[task.level] * cast[l.speaker]!.rate),
+    );
+    let t = 0;
+    this.starts = this.lengths.map((length, i) => {
+      t += pauseBefore(task, i) / 1000;
+      const start = t;
+      t += length;
+      return start;
+    });
+    this.total = t;
+  }
+
+  /** The pause before line `i` begins. */
+  pause(i: number) {
+    this.line = i;
+    this.since = performance.now();
+    this.playing = false;
+    this.el = null;
+  }
+
+  /** Line `i` begins: from a recording playing in `el`, or else read by a voice at `rate`. */
+  play(i: number, el: HTMLAudioElement | null, rate = 1) {
+    this.pause(i);
+    this.playing = true;
+    this.el = el;
+    this.rate = rate;
+  }
+
+  /** How far the playback has come, from 0 to 1. */
+  progress(): number {
+    const pause = pauseBefore(this.task, this.line) / 1000;
+    const elapsed = (performance.now() - this.since) / 1000;
+    const into = this.playing
+      ? Math.min(this.lengths[this.line], this.el ? this.el.currentTime : elapsed * this.rate)
+      : Math.min(pause, elapsed) - pause;
+    return this.total ? Math.max(0, Math.min(1, (this.starts[this.line] + into) / this.total)) : 0;
+  }
+}
+
+/** Keeps a bar's width at `progress` on every frame, until the returned function is called. */
+export function follow(bar: HTMLElement, progress: () => number): () => void {
+  let frame = requestAnimationFrame(function step() {
+    bar.style.width = `${progress() * 100}%`;
+    frame = requestAnimationFrame(step);
+  });
+  return () => cancelAnimationFrame(frame);
+}
 
 /* ---------- Sound effects for recordings ---------- */
 
@@ -175,6 +247,12 @@ export class ExamSound {
   private sound: Sound | null | undefined = undefined;
   private run = 0;
   private end: (() => void) | null = null;
+  private timeline: Timeline | null = null;
+
+  /** How far the task that is playing has come, from 0 to 1; 0 while nothing or something else plays. */
+  progress(): number {
+    return this.timeline?.progress() ?? 0;
+  }
 
   unlock() {
     this.el ??= new Audio();
@@ -253,11 +331,14 @@ export class ExamSound {
     const recorded = isRecorded(task);
     const cast = castVoices(task);
     const speech = recorded ? {} : browserVoices(task, cast, voices);
+    const timeline = (this.timeline = new Timeline(task));
     for (let i = 0; i < Math.min(lines, task.lines.length); i++) {
+      timeline.pause(i);
       if (i > 0) await wait(pauseBefore(task, i));
       if (id !== this.run) return false;
       onLine?.(i);
       const line = task.lines[i];
+      timeline.play(i, recorded ? (this.el ??= new Audio()) : null);
       if (recorded) await this.playFile(recordingUrl(task, i), effectFor(task, line.speaker));
       else {
         const v = speech[line.speaker];
@@ -271,6 +352,7 @@ export class ExamSound {
   /** Reads the task's questions aloud from their recordings. Resolves with false when it was stopped. */
   async readQuestions(task: ListeningTask): Promise<boolean> {
     const id = ++this.run;
+    this.timeline = null;
     for (const [i, q] of task.questions.entries()) {
       const url = narrationUrl(q.prompt);
       if (!url) continue;
@@ -285,6 +367,7 @@ export class ExamSound {
   /** Reads an instruction aloud: its recording, or else the best Norwegian voice the browser has. */
   async say(text: string, voices: SpeechSynthesisVoice[]): Promise<boolean> {
     const id = ++this.run;
+    this.timeline = null;
     const url = narrationUrl(text);
     if (url) {
       await this.playFile(url, undefined);

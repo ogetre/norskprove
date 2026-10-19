@@ -37,7 +37,6 @@ async function SkillPageContent({ params }: { params: PageProps<"/trening/[skill
       official={info.official}
       ready={info.ready}
       tasks={tasks}
-      fullMinutes={c?.tests.full.minutes ?? 0}
     />
   );
 }

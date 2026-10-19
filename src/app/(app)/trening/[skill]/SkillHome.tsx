@@ -34,13 +34,11 @@ export function SkillHome({
   official,
   ready,
   tasks,
-  fullMinutes,
 }: {
   skill: Skill;
   official: string;
   ready: boolean;
   tasks: TaskMeta[];
-  fullMinutes: number;
 }) {
   const state = useAppState();
   const hydrated = useHydrated();
@@ -130,7 +128,7 @@ export function SkillHome({
                   <p className="mt-3 leading-relaxed text-mist">
                     {skill === "lytting"
                       ? "Som lytteprøven på Norskprøven: to forprøver og en hovedprøve på ditt nivå. Lyden spilles av seg selv, to ganger, eller bare én gang på B2, og prøven går videre uten vei tilbake. Du får nivå og gjennomgang til slutt."
-                      : `Som på prøvedagen: ${fullMinutes} minutter, tidtaker og to deler. Del 1 avgjør om du får A1–A2- eller B1–B2-oppgaver i del 2. Du får nivå og gjennomgang til slutt.`}
+                      : "Som leseprøven på Norskprøven: to forprøver på 15 minutter og en hovedprøve på ditt nivå, 75 minutter i alt. Du kan bla i en del, men ikke gå tilbake til en del du er ferdig med. Du får nivå og gjennomgang til slutt."}
                   </p>
                   {unfinished && <UnfinishedNote />}
                 </div>

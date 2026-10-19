@@ -18,7 +18,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { listeningTasks } from "../src/content/listening";
 import { audioKey } from "../src/lib/casting";
-import { addUsage, family, plan, synthesize, voicePools } from "./generate-audio";
+import { addUsage, family, measure, plan, readManifest, synthesize, voicePools, writeManifest } from "./generate-audio";
 import { accessToken, projectId } from "./google-auth";
 
 const ROOT = path.resolve(__dirname, "..");
@@ -97,6 +97,7 @@ async function main() {
 
   const failed: { line: string; script: string; heard: string; problem: string }[] = [];
   let fixed = 0;
+  const retaken = new Set<(typeof items)[number]["task"]>();
   let next = 0;
   let done = 0;
   const worker = async () => {
@@ -108,6 +109,7 @@ async function main() {
         const p = plan(task, pools!)[i];
         await writeFile(file, await synthesize(p));
         await addUsage(p.text.length);
+        retaken.add(task);
         verdict = await verify(file, script);
         if (verdict.ok) fixed++;
       }
@@ -116,6 +118,12 @@ async function main() {
     }
   };
   await Promise.all(Array.from({ length: WORKERS }, worker));
+  if (retaken.size) {
+    // A retake is a little longer or shorter, and the player's progress bar goes by the lengths.
+    const m = await readManifest();
+    for (const task of retaken) m.durations[task.id] = measure(task, m.tasks[task.id]);
+    await writeManifest(m);
+  }
 
   await writeFile(REPORT, JSON.stringify({ voices: family, checked: items.length, fixed, failed }, null, 2) + "\n");
   console.log(`Done: ${items.length} lines, ${fixed} recorded again, ${failed.length} still not matching. Details in .audio-check.json.`);

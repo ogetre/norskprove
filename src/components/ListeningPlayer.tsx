@@ -5,10 +5,12 @@ import { castVoices, effectFor, LEVEL_RATE, speakerOrder } from "@/lib/casting";
 import {
   browserVoices,
   connectEffects,
+  follow,
   isRecorded,
   NATURAL_VOICE,
   pauseBefore,
   recordingUrl,
+  Timeline,
   wait,
   type Sound,
 } from "@/lib/listening-audio";
@@ -57,6 +59,8 @@ export function ListeningPlayer({
   const sound = useRef<Sound | null | undefined>(undefined);
   /** Ends the line that is playing right now. */
   const endLine = useRef<(() => void) | null>(null);
+  const timeline = useMemo(() => new Timeline(task), [task]);
+  const bar = useRef<HTMLDivElement>(null);
 
   const speechReady = hydrated && "speechSynthesis" in window && voices.length > 0;
   const canPlay = recorded || speechReady;
@@ -69,6 +73,13 @@ export function ListeningPlayer({
     const t = setTimeout(() => setWaited(true), 1500);
     return () => clearTimeout(t);
   }, []);
+
+  // The bar follows the sound frame by frame while it plays, and starts empty for a new task.
+  useEffect(() => {
+    if (!bar.current) return;
+    if (!playing) return void (bar.current.style.width = "0%");
+    return follow(bar.current, () => timeline.progress());
+  }, [playing, timeline]);
 
   useEffect(() => {
     const runs = run;
@@ -93,6 +104,7 @@ export function ListeningPlayer({
       el.src = recordingUrl(task, i);
       el.defaultPlaybackRate = speedRef.current;
       el.playbackRate = speedRef.current;
+      timeline.play(i, el);
       const done = () => {
         el.onended = el.onerror = null;
         endLine.current = null;
@@ -116,6 +128,7 @@ export function ListeningPlayer({
       u.voice = v?.voice ?? null;
       u.pitch = v?.pitch ?? 1;
       u.rate = LEVEL_RATE[task.level] * cast[l.speaker]!.rate * speedRef.current;
+      timeline.play(i, null, speedRef.current);
       const done = () => {
         endLine.current = null;
         resolve();
@@ -137,6 +150,7 @@ export function ListeningPlayer({
     if (!recorded) window.speechSynthesis.cancel();
     setPlaying(true);
     for (let i = from; i < task.lines.length; i++) {
+      timeline.pause(i);
       if (i > from) await wait(pauseBefore(task, i));
       if (id !== run.current) return;
       setLine(i);
@@ -154,6 +168,7 @@ export function ListeningPlayer({
     endLine.current?.();
     setPlaying(false);
     setLine(-1);
+    if (bar.current) bar.current.style.width = "0%";
   };
 
   const changeSpeed = (s: number) => {
@@ -163,7 +178,6 @@ export function ListeningPlayer({
   };
 
   const transcriptVisible = showTranscript || fallbackText;
-  const progress = line < 0 ? 0 : (line + 1) / task.lines.length;
 
   return (
     <div className="rounded-xl bg-fjord-deep p-5 text-snow shadow-[0_24px_50px_-30px_rgb(15_43_60/0.7)] sm:p-6">
@@ -203,7 +217,7 @@ export function ListeningPlayer({
             ))}
           </div>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/15">
-            <div className="h-full rounded-full bg-[#7fe0b8] transition-[width] duration-500" style={{ width: `${progress * 100}%` }} />
+            <div ref={bar} className="h-full w-0 rounded-full bg-[#7fe0b8]" />
           </div>
           <p className="mt-2 text-sm text-mist" aria-live="polite">
             {playing

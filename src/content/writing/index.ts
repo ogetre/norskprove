@@ -184,16 +184,20 @@ export function getWritingTask(id: string) {
 export type WritingSlot = { level: Level; kinds: WritingKind[] };
 export type WritingBand = { id: string; label: string; minutes: number; slots: WritingSlot[] };
 
-/** Full tests are taken at a chosen level band, like the real written exam. */
+/**
+ * Full tests are taken at a chosen level band, like the real written exam: three texts in 90
+ * minutes at A1–A2 and A2–B1, and at B1–B2 an e-mail and an opinion text in 120 minutes.
+ */
 export const writingTests = {
   trial: "bursdagsinvitasjon",
   bands: [
     {
       id: "a1-a2",
       label: "A1–A2",
-      minutes: 60,
+      minutes: 90,
       slots: [
         { level: "A1", kinds: ["e-post"] },
+        { level: "A2", kinds: ["e-post"] },
         { level: "A2", kinds: ["beskrivelse", "fortelling"] },
       ],
     },
@@ -203,15 +207,16 @@ export const writingTests = {
       minutes: 90,
       slots: [
         { level: "A2", kinds: ["e-post"] },
-        { level: "B1", kinds: ["e-post", "meningstekst"] },
+        { level: "B1", kinds: ["e-post"] },
+        { level: "B1", kinds: ["meningstekst", "fortelling", "beskrivelse"] },
       ],
     },
     {
       id: "b1-b2",
       label: "B1–B2",
-      minutes: 90,
+      minutes: 120,
       slots: [
-        { level: "B1", kinds: ["e-post", "fortelling", "beskrivelse"] },
+        { level: "B1", kinds: ["e-post"] },
         { level: "B2", kinds: ["meningstekst"] },
       ],
     },

@@ -18,6 +18,7 @@ function conversation(task: SpeakingTask, turns: Turn[]): string {
   return [
     `Oppgave på nivå ${task.level} (${SPEAKING_KIND_NAMES[task.kind].toLowerCase()}): ${task.title}`,
     `Situasjon: ${task.intro}`,
+    ...(task.image ? [`Bildet kandidaten ser: ${task.image.alt}`] : []),
     `Spørsmålene i oppgaven: ${task.questions.join(" / ")}`,
     `Kandidaten bør snakke om: ${task.points.join("; ")}`,
     "",

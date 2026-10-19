@@ -7,7 +7,7 @@ import { SpeakingExam } from "./SpeakingExam";
 export const metadata: Metadata = { title: "Muntlig prøve" };
 
 export default function SpeakingExamPage() {
-  const bands = speakingTests.bands.map((b) => ({ id: b.id, label: b.label, pools: speakingPools(b) }));
+  const bands = speakingTests.bands.map((b) => ({ id: b.id, label: b.label, parts: b.slots.map((s) => s.label), pools: speakingPools(b) }));
   return (
     <FreshVisit>
       <Paywall skill="muntlig" feature="Muntlig prøve">

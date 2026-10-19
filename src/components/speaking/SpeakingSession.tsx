@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAccess } from "@/components/Access";
@@ -76,6 +77,22 @@ function Wave({ active, tone = "light" }: { active: boolean; tone?: "light" | "r
   );
 }
 
+/** The picture of a picture task, to look at while preparing and answering. */
+function Picture({ task, compact = false, className = "" }: { task: SpeakingTask; compact?: boolean; className?: string }) {
+  if (!task.image) return null;
+  return (
+    <Image
+      src={task.image.src}
+      alt={task.image.alt}
+      width={1200}
+      height={876}
+      sizes="(min-width: 48rem) 46rem, 100vw"
+      // While answering it stays small enough to keep the answer in view.
+      className={`rounded-xl bg-white ${compact ? "mx-auto h-auto max-h-[40vh] w-auto" : "h-auto w-full"} ${className}`}
+    />
+  );
+}
+
 function CheckList({ checks }: { checks: Check[] }) {
   return (
     <ul className="mt-3 space-y-2">
@@ -105,6 +122,7 @@ function TaskResult({ task, answers, checks }: { task: SpeakingTask; answers: An
         <span className="text-granite">{SPEAKING_KIND_NAMES[task.kind]}</span>
       </div>
       <h2 className="mt-2 text-xl font-semibold">{task.title}</h2>
+      <Picture task={task} className="mt-4 max-w-md" />
 
       <ol className="mt-5 space-y-5">
         {answers.map((a, i) => (
@@ -391,6 +409,7 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
           </div>
           <h2 className="mt-2 font-display text-2xl font-medium tracking-tight sm:text-3xl">{task.title}</h2>
           <p className="mt-3 text-lg leading-relaxed">{task.intro}</p>
+          <Picture task={task} className="mt-5 ring-1 ring-ice" />
           <div className="mt-6 grid gap-5 sm:grid-cols-2">
             <div>
               <p className="text-sm font-semibold text-granite">Snakk om</p>
@@ -473,6 +492,7 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
           >
             «{question}»
           </p>
+          <Picture task={task} compact className="mt-6" />
 
           {phase === "record" && (
             <div className="rise mt-8">

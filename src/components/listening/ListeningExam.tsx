@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Questions } from "@/components/Questions";
+import { BriefingSlide, ExamResultScreen, ExamReview, reviveAnswers } from "@/components/exam/ExamScreens";
 import { ResumeCard } from "@/components/ResumeCard";
-import { Stimulus } from "@/components/Stimulus";
-import { ExamSound, questionsRecorded } from "@/lib/listening-audio";
+import { ExamSound, follow, questionsRecorded } from "@/lib/listening-audio";
 import {
   answerSeconds,
   bandAfter,
@@ -13,6 +12,7 @@ import {
   drawPart,
   examResult,
   GAP_SECONDS,
+  KINDS,
   PART_NAMES,
   playsFor,
   readSeconds,
@@ -20,16 +20,13 @@ import {
   share,
   type Band,
   type ExamResult,
-  type PartKind,
   type Route,
 } from "@/lib/listening-exam";
-import { initialAnswer, isAnswered, totals, type Answer } from "@/lib/scoring";
+import { initialAnswer, isAnswered, type Answer } from "@/lib/scoring";
 import { recordAttempt } from "@/lib/store";
 import { useNorwegianVoices } from "@/lib/tts";
 import type { ListeningTask } from "@/lib/types";
 import { clearUnfinished, loadUnfinished, saveUnfinished, savedAtLabel } from "@/lib/unfinished";
-
-const KINDS: PartKind[] = ["forprove1", "forprove2", "hoved"];
 
 type Phase = "intro" | "resume" | "briefing" | "task" | "result" | "review";
 type Step = "read" | "play" | "gap" | "answer";
@@ -56,11 +53,7 @@ function restore(saved: Saved | null, tasks: ListeningTask[]) {
   if (parts.some((p) => p.some((t) => !t))) return null;
   const ok = parts.every((p, pi) => saved.answers[pi]?.length === p.length && p.every((t, ti) => saved.answers[pi][ti]?.length === t!.questions.length));
   if (!ok || !parts[saved.part]?.[saved.task]) return null;
-  // JSON turns unanswered blanks into null; the answer checks expect undefined.
-  const answers = saved.answers.map((part) =>
-    part.map((row) => row.map((a) => (a === null ? undefined : Array.isArray(a) ? a.map((v) => v ?? undefined) : a))),
-  ) as Answer[][][];
-  return { ...saved, parts: parts as ListeningTask[][], answers };
+  return { ...saved, parts: parts as ListeningTask[][], answers: reviveAnswers(saved.answers) };
 }
 
 function Wave({ active }: { active: boolean }) {
@@ -85,6 +78,7 @@ function AudioPanel({
   hearing,
   left,
   span,
+  progress,
   onSkip,
 }: {
   task: ListeningTask;
@@ -94,9 +88,19 @@ function AudioPanel({
   hearing: "questions" | "text";
   left: number;
   span: number;
+  /** How far the recording has come, from 0 to 1. */
+  progress: () => number;
   onSkip: () => void;
 }) {
   const plays = playsFor(task);
+  const bar = useRef<HTMLDivElement>(null);
+  const listening = step === "play" && hearing === "text";
+
+  // While the text plays the bar follows its time; otherwise it counts down to the next step.
+  useEffect(() => {
+    if (!listening || !bar.current) return;
+    return follow(bar.current, progress);
+  }, [listening, progress]);
   const steps: { id: string; label: string }[] = [
     { id: "read", label: "Les spørsmålene" },
     { id: "play1", label: plays === 1 ? "Lytt én gang" : "1. gang" },
@@ -140,8 +144,12 @@ function AudioPanel({
       <div className="mt-6">
         <Wave active={step === "play"} />
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
-          {step !== "play" && (
-            <div className="h-full rounded-full bg-[#7fe0b8] transition-[width] duration-200 ease-linear" style={{ width: `${Math.max(0, Math.min(1, left / span)) * 100}%` }} />
+          {listening ? (
+            <div ref={bar} className="h-full w-0 rounded-full bg-[#7fe0b8]" />
+          ) : (
+            step !== "play" && (
+              <div className="h-full rounded-full bg-white/40 transition-[width] duration-200 ease-linear" style={{ width: `${Math.max(0, Math.min(1, left / span)) * 100}%` }} />
+            )
           )}
         </div>
         <p className="mt-3 text-sm text-ice" aria-live="polite">
@@ -168,6 +176,7 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
   const voicesRef = useRef(voices);
   const sound = useRef<ExamSound | null>(null);
   const engine = () => (sound.current ??= new ExamSound());
+  const progress = useCallback(() => sound.current?.progress() ?? 0, []);
 
   const [restored] = useState(() => restore(loadUnfinished<Saved>("lytting"), tasks));
   const [phase, setPhase] = useState<Phase>(restored ? "resume" : "intro");
@@ -467,137 +476,48 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
   if (phase === "briefing") {
     const b = briefing(KINDS[part], band);
     return (
-      <div className="fixed inset-0 z-40 grid place-items-center overflow-y-auto bg-fjord-deep px-4 py-10 text-snow">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-          <div className="aurora" />
-        </div>
-        <section className="rise relative w-full max-w-xl" aria-labelledby="briefing-title">
-          <p className="text-sm text-mist">Del {part + 1} av 3</p>
-          <h1 id="briefing-title" className="mt-2 font-display text-4xl font-medium tracking-tight sm:text-5xl">
-            {b.title}
-          </h1>
-          <ul className="mt-7 space-y-3 text-lg leading-relaxed text-ice">
-            {b.points.map((p) => (
-              <li key={p} className="flex gap-3">
-                <span aria-hidden="true" className="mt-3 size-1.5 shrink-0 rounded-full bg-[#7fe0b8]" />
-                {p}
-              </li>
-            ))}
-          </ul>
-          <div className="mt-9 flex flex-wrap items-center gap-4">
-            <button
-              type="button"
-              onClick={() => {
-                engine().stop();
-                beginTask(part, 0, parts[part]);
-              }}
-              className="rounded-md bg-snow px-6 py-3 font-medium text-ink transition-colors hover:bg-ice"
-            >
-              Start {b.title.split(" (")[0].toLowerCase()}
-            </button>
-            <span className="text-sm text-mist" aria-live="polite">
-              {narrated ? `Starter om ${clock(deadline - now)}` : "Hør på instruksjonen …"}
-            </span>
-          </div>
-        </section>
-      </div>
+      <BriefingSlide part={part} title={b.title} points={b.points}>
+        <button
+          type="button"
+          onClick={() => {
+            engine().stop();
+            beginTask(part, 0, parts[part]);
+          }}
+          className="rounded-md bg-snow px-6 py-3 font-medium text-ink transition-colors hover:bg-ice"
+        >
+          Start {b.title.split(" (")[0].toLowerCase()}
+        </button>
+        <span className="text-sm text-mist" aria-live="polite">
+          {narrated ? `Starter om ${clock(deadline - now)}` : "Hør på instruksjonen …"}
+        </span>
+      </BriefingSlide>
     );
   }
 
   if (phase === "result" && result) {
-    const label = result.level === "under A1" ? "Under A1" : result.level;
-    const rows = parts.map((p, i) => {
-      const t = totals(
-        p.flatMap((x) => x.questions),
-        answers[i].flat(),
-      );
-      const name =
-        i === 0 ? "Forprøve 1 (A2)" : i === 1 ? `Forprøve 2 (${route === "hard" ? "vanskelig, B1" : "lett, A1"})` : `Hovedprøven (${band})`;
-      return { name, ...t };
-    });
     return (
-      <div className="mx-auto max-w-3xl">
-        <div className="rise relative overflow-hidden rounded-2xl bg-fjord-deep p-8 text-snow sm:p-10">
-          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-            <div className="aurora" />
-          </div>
-          <div className="relative">
-            <p className="text-mist">Resultat, lytteprøve</p>
-            <p className="mt-3 font-display text-6xl font-medium tracking-tight sm:text-7xl">{label}</p>
-            <p className="mt-3 text-lg text-ice">
-              {result.correct} av {result.total} poeng ({Math.round((result.correct / Math.max(1, result.total)) * 100)} %)
-            </p>
-          </div>
-        </div>
-        <section className="mt-6 rounded-2xl bg-surface p-6 ring-1 ring-ice" aria-labelledby="path-title">
-          <h2 id="path-title" className="font-semibold">
-            Veien gjennom prøven
-          </h2>
-          <ol className="mt-4 divide-y divide-ice">
-            {rows.map((r) => (
-              <li key={r.name} className="flex items-center justify-between gap-4 py-3">
-                <span>{r.name}</span>
-                <span className="font-semibold tabular-nums">
-                  {r.correct} av {r.total}
-                </span>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-3 text-sm leading-relaxed text-granite">
-            Nivået er det høyeste nivået der du fikk minst 60 % riktig. Som på prøven er det oppgavene i hovedprøven som avgjør mest.
-          </p>
-        </section>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" onClick={() => setPhase("review")} className="rounded-md bg-ink px-5 py-2.5 font-medium text-snow hover:bg-fjord">
-            Se gjennomgang
-          </button>
-          <button type="button" onClick={start} className="rounded-md px-5 py-2.5 font-medium text-ink ring-1 ring-ice hover:bg-ice">
-            Ta en ny prøve
-          </button>
-          <Link href="/trening/lytting" className="rounded-md px-5 py-2.5 font-medium text-granite hover:text-ink">
-            Tilbake
-          </Link>
-        </div>
-      </div>
+      <ExamResultScreen
+        title="Resultat, lytteprøve"
+        result={result}
+        parts={parts}
+        answers={answers}
+        route={route}
+        band={band}
+        backHref="/trening/lytting"
+        onReview={() => setPhase("review")}
+        onRestart={start}
+      />
     );
   }
 
   if (phase === "review") {
     return (
-      <div className="mx-auto max-w-5xl">
-        <button type="button" onClick={() => setPhase("result")} className="text-sm text-granite underline-offset-4 hover:text-ink hover:underline">
-          Tilbake til resultatet
-        </button>
-        <h1 className="mt-3 font-display text-3xl font-medium tracking-tight">Gjennomgang</h1>
-        {parts.map((p, pi) => {
-          let n = 1;
-          return (
-            <section key={pi} className="mt-10" aria-label={PART_NAMES[KINDS[pi]]}>
-              <h2 className="text-xl font-semibold">{PART_NAMES[KINDS[pi]]}</h2>
-              <ol className="mt-6 space-y-12">
-                {p.map((t, ti) => {
-                  const start = n;
-                  n += t.questions.length;
-                  return (
-                    <li key={t.id} className="grid gap-8 lg:grid-cols-2">
-                      <div>
-                        <p className="text-sm text-granite">
-                          {t.level}, {playsFor(t) === 1 ? "spilt av én gang" : "spilt av to ganger"}
-                        </p>
-                        <h3 className="mt-1 text-lg font-semibold">{t.title}</h3>
-                        <div className="mt-4">
-                          <Stimulus task={t} mode="review" />
-                        </div>
-                      </div>
-                      <Questions questions={t.questions} answers={answers[pi][ti]} submitted onAnswer={() => {}} start={start} />
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          );
-        })}
-      </div>
+      <ExamReview
+        parts={parts}
+        answers={answers}
+        about={(t) => `${t.level}, ${playsFor(t as ListeningTask) === 1 ? "spilt av én gang" : "spilt av to ganger"}`}
+        onBack={() => setPhase("result")}
+      />
     );
   }
 
@@ -631,7 +551,7 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
 
       <main className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-8 lg:grid-cols-[1fr_1.15fr] lg:gap-12">
         <section aria-label="Lytteteksten" className="lg:sticky lg:top-28 lg:self-start">
-          <AudioPanel task={task} step={step} round={round} hearing={hearing} left={left} span={span} onSkip={() => {
+          <AudioPanel task={task} step={step} round={round} hearing={hearing} left={left} span={span} progress={progress} onSkip={() => {
             consumed.current = deadline;
             setStep("play");
           }} />
