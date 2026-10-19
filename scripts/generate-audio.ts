@@ -6,6 +6,7 @@
  *   npm run audio -- --force     records every task again
  *   npm run audio -- --only=pa-kafeen,hos-legen
  *   npm run audio -- --parallel=6     lines recorded at once (default 4, or 2 for Gemini voices)
+ *   npm run audio -- --durations     only measures the recorded lines again (needs ffprobe)
  *
  * Needs GOOGLE_TTS_API_KEY in .env.local. Each line becomes its own MP3 in
  * public/audio/lytting/<task>/, and src/content/listening/audio.json lists the recorded tasks,
@@ -48,12 +49,14 @@ const USAGE = path.join(ROOT, ".audio-usage.json");
 const MAX_CHARS = 200_000;
 const MONTH_CHARS = 800_000;
 
-type Manifest = { voices: string | null; tasks: Record<string, string> };
+/** The recorded tasks, and how long each line is in seconds, so the player's progress bar can follow the time. */
+export type Manifest = { voices: string | null; tasks: Record<string, string>; durations: Record<string, number[]> };
 type Pools = Record<VoiceGender, string[]>;
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const force = args.includes("--force");
+const durationsOnly = args.includes("--durations");
 const allowMore = args.includes("--allow-more");
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length).split(",");
 /** Voice family to use. Chirp 3 HD is free up to 1 million characters a month. */
@@ -297,17 +300,30 @@ export async function synthesize(p: ReturnType<typeof plan>[number]): Promise<Bu
   return gemini ? tighten(audio, p.maxPause) : audio;
 }
 
-async function readManifest(): Promise<Manifest> {
+export async function readManifest(): Promise<Manifest> {
   try {
-    return JSON.parse(await readFile(MANIFEST, "utf8")) as Manifest;
+    return { durations: {}, ...(JSON.parse(await readFile(MANIFEST, "utf8")) as Partial<Manifest>) } as Manifest;
   } catch {
-    return { voices: null, tasks: {} };
+    return { voices: null, tasks: {}, durations: {} };
   }
 }
 
-async function writeManifest(m: Manifest) {
-  const tasks = Object.fromEntries(Object.entries(m.tasks).sort(([a], [b]) => a.localeCompare(b)));
-  await writeFile(MANIFEST, JSON.stringify({ voices: m.voices, tasks }, null, 2) + "\n");
+export async function writeManifest(m: Manifest) {
+  const ids = Object.keys(m.tasks).sort((a, b) => a.localeCompare(b));
+  const tasks = Object.fromEntries(ids.map((id) => [id, m.tasks[id]]));
+  const durations = Object.fromEntries(ids.filter((id) => m.durations[id]).map((id) => [id, m.durations[id]]));
+  // One line per task's durations instead of one per number.
+  const json = JSON.stringify({ voices: m.voices, tasks, durations }, null, 2).replace(/\[\s+([\d.,\s]+?)\s+\]/g, (_, xs: string) => `[${xs.split(/,\s*/).join(", ")}]`);
+  await writeFile(MANIFEST, json + "\n");
+}
+
+/** How long each recorded line of a task is, in seconds. Needs ffprobe. */
+export function measure(task: ListeningTask, key: string): number[] {
+  return task.lines.map((_, i) => {
+    const file = path.join(AUDIO_DIR, task.id, `${key}-${i}.mp3`);
+    const out = execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { encoding: "utf8" });
+    return Math.round(Number(out) * 100) / 100;
+  });
 }
 
 const FX: Record<string, string> = {
@@ -340,6 +356,12 @@ async function writePreview(task: ListeningTask, lines: ReturnType<typeof plan>,
 
 async function main() {
   const manifest = await readManifest();
+  if (durationsOnly) {
+    for (const task of listeningTasks) if (manifest.tasks[task.id] === audioKey(task)) manifest.durations[task.id] = measure(task, audioKey(task));
+    await writeManifest(manifest);
+    console.log(`Measured ${Object.keys(manifest.durations).length} tasks.`);
+    return;
+  }
   const sameVoices = manifest.voices === family;
   const todo = listeningTasks.filter((t) => {
     if (only && !only.includes(t.id)) return false;
@@ -372,7 +394,7 @@ async function main() {
   const pools = await voicePools();
   console.log(`Voices: ${[...pools.kvinne, ...pools.mann].join(", ")}`);
   if (!preview) {
-    if (!sameVoices) manifest.tasks = {};
+    if (!sameVoices) manifest.tasks = manifest.durations = {};
     manifest.voices = family;
   }
 
@@ -399,6 +421,7 @@ async function main() {
     // Remove recordings of older versions of the text.
     for (const file of await readdir(dir)) if (!file.startsWith(`${key36}-`)) await rm(path.join(dir, file));
     manifest.tasks[task.id] = key36;
+    manifest.durations[task.id] = measure(task, key36);
     await writeManifest(manifest);
     console.log(`${++done}/${todo.length} ${task.id}`);
   }

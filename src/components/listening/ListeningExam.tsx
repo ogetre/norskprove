@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Questions } from "@/components/Questions";
 import { ResumeCard } from "@/components/ResumeCard";
 import { Stimulus } from "@/components/Stimulus";
-import { ExamSound, questionsRecorded } from "@/lib/listening-audio";
+import { ExamSound, follow, questionsRecorded } from "@/lib/listening-audio";
 import {
   answerSeconds,
   bandAfter,
@@ -85,6 +85,7 @@ function AudioPanel({
   hearing,
   left,
   span,
+  progress,
   onSkip,
 }: {
   task: ListeningTask;
@@ -94,9 +95,19 @@ function AudioPanel({
   hearing: "questions" | "text";
   left: number;
   span: number;
+  /** How far the recording has come, from 0 to 1. */
+  progress: () => number;
   onSkip: () => void;
 }) {
   const plays = playsFor(task);
+  const bar = useRef<HTMLDivElement>(null);
+  const listening = step === "play" && hearing === "text";
+
+  // While the text plays the bar follows its time; otherwise it counts down to the next step.
+  useEffect(() => {
+    if (!listening || !bar.current) return;
+    return follow(bar.current, progress);
+  }, [listening, progress]);
   const steps: { id: string; label: string }[] = [
     { id: "read", label: "Les spørsmålene" },
     { id: "play1", label: plays === 1 ? "Lytt én gang" : "1. gang" },
@@ -140,8 +151,12 @@ function AudioPanel({
       <div className="mt-6">
         <Wave active={step === "play"} />
         <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
-          {step !== "play" && (
-            <div className="h-full rounded-full bg-[#7fe0b8] transition-[width] duration-200 ease-linear" style={{ width: `${Math.max(0, Math.min(1, left / span)) * 100}%` }} />
+          {listening ? (
+            <div ref={bar} className="h-full w-0 rounded-full bg-[#7fe0b8]" />
+          ) : (
+            step !== "play" && (
+              <div className="h-full rounded-full bg-white/40 transition-[width] duration-200 ease-linear" style={{ width: `${Math.max(0, Math.min(1, left / span)) * 100}%` }} />
+            )
           )}
         </div>
         <p className="mt-3 text-sm text-ice" aria-live="polite">
@@ -168,6 +183,7 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
   const voicesRef = useRef(voices);
   const sound = useRef<ExamSound | null>(null);
   const engine = () => (sound.current ??= new ExamSound());
+  const progress = useCallback(() => sound.current?.progress() ?? 0, []);
 
   const [restored] = useState(() => restore(loadUnfinished<Saved>("lytting"), tasks));
   const [phase, setPhase] = useState<Phase>(restored ? "resume" : "intro");
@@ -631,7 +647,7 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
 
       <main className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-8 lg:grid-cols-[1fr_1.15fr] lg:gap-12">
         <section aria-label="Lytteteksten" className="lg:sticky lg:top-28 lg:self-start">
-          <AudioPanel task={task} step={step} round={round} hearing={hearing} left={left} span={span} onSkip={() => {
+          <AudioPanel task={task} step={step} round={round} hearing={hearing} left={left} span={span} progress={progress} onSkip={() => {
             consumed.current = deadline;
             setStep("play");
           }} />
