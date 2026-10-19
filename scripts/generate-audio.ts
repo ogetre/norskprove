@@ -5,6 +5,7 @@
  *   npm run audio                records new and changed tasks
  *   npm run audio -- --force     records every task again
  *   npm run audio -- --only=pa-kafeen,hos-legen
+ *   npm run audio -- --parallel=6     lines recorded at once (default 4, or 2 for Gemini voices)
  *
  * Needs GOOGLE_TTS_API_KEY in .env.local. Each line becomes its own MP3 in
  * public/audio/lytting/<task>/, and src/content/listening/audio.json lists the recorded tasks,
@@ -56,7 +57,7 @@ const force = args.includes("--force");
 const allowMore = args.includes("--allow-more");
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length).split(",");
 /** Voice family to use. Chirp 3 HD is free up to 1 million characters a month. */
-const family = args.find((a) => a.startsWith("--voices="))?.slice("--voices=".length) ?? "Chirp3-HD";
+export const family = args.find((a) => a.startsWith("--voices="))?.slice("--voices=".length) ?? "Chirp3-HD";
 /** Gemini voices act each line from a director's note. */
 const gemini = family.startsWith("gemini");
 /** Chirp and Gemini voices don't take a pitch, but they have so many voices that no task needs one. */
@@ -96,6 +97,13 @@ async function authHeaders(): Promise<Record<string, string>> {
 type Usage = Record<string, Record<string, number>>;
 const month = new Date().toISOString().slice(0, 7);
 
+/** Adds characters sent outside a recording run (retakes) to this month's count. */
+export async function addUsage(chars: number) {
+  const usage = await readUsage();
+  usage[month] = { ...usage[month], [family]: (usage[month]?.[family] ?? 0) + chars };
+  await writeFile(USAGE, JSON.stringify(usage, null, 2) + "\n");
+}
+
 async function readUsage(): Promise<Usage> {
   try {
     return JSON.parse(await readFile(USAGE, "utf8")) as Usage;
@@ -106,7 +114,15 @@ async function readUsage(): Promise<Usage> {
 
 async function call<T>(url: string, init?: RequestInit, tries = 6): Promise<T> {
   for (let attempt = 1; ; attempt++) {
-    const res = await fetch(url, init);
+    // A dropped connection is retried like a busy server.
+    const res = await fetch(url, init).catch((err: unknown) => {
+      if (attempt < tries) return null;
+      throw err;
+    });
+    if (!res) {
+      await new Promise((r) => setTimeout(r, Math.min(60_000, 2000 * 2 ** attempt)));
+      continue;
+    }
     if (res.ok) return (await res.json()) as T;
     const body = await res.text();
     if ((res.status === 429 || res.status >= 500) && attempt < tries) {
@@ -117,7 +133,7 @@ async function call<T>(url: string, init?: RequestInit, tries = 6): Promise<T> {
   }
 }
 
-async function voicePools(): Promise<Pools> {
+export async function voicePools(): Promise<Pools> {
   type Voice = { name: string; ssmlGender: string; languageCodes: string[] };
   const { voices } = await call<{ voices: Voice[] }>(`${API}/voices?languageCode=nb-NO`, { headers: await authHeaders() });
   // Gemini voices have the same names as Chirp 3 HD's, without the prefix: «Kore», «Puck».
@@ -152,7 +168,7 @@ export function spoken(text: string): string {
 }
 
 const PACE: Record<ListeningTask["level"], string> = {
-  A1: "slowly and very clearly, with small pauses, as to a beginner",
+  A1: "a bit slower than normal and very clearly, without long pauses between the words",
   A2: "a little slower than normal and clearly",
   B1: "at a natural, everyday pace",
   B2: "at a natural, lively everyday pace, as people really talk",
@@ -173,13 +189,68 @@ export function direction(task: ListeningTask, speaker: ListeningTask["lines"][n
   return [
     "Read the transcript aloud in Norwegian bokmål with an Eastern Norwegian accent. Do not read these notes aloud.",
     `Scene (${task.genre}): ${task.situation} ${setting}`.trim(),
-    `Speaker: ${who}. Show the feelings the situation calls for, as an actor would.`,
+    `Your role (never say it): ${who}. Show the feelings the situation calls for, as an actor would.`,
     `Pace: ${PACE[task.level]}. Sound like a real person, not a newsreader.`,
   ].join("\n");
 }
 
+/** Longest pause kept inside a line, in seconds: a little longer for beginners. */
+const MAX_PAUSE: Record<ListeningTask["level"], number> = { A1: 0.5, A2: 0.45, B1: 0.4, B2: 0.35 };
+
+/**
+ * Gemini voices sometimes pause for most of a second between words, which makes slow levels drag.
+ * Shortens every pause to at most `maxPause` seconds and trims silence at the ends, judging
+ * silence by the loudness of each 10 ms. Needs ffmpeg.
+ */
+export function tighten(mp3: Buffer, maxPause: number): Buffer {
+  const rate = 24000;
+  const pcm = execFileSync("ffmpeg", ["-loglevel", "error", "-i", "pipe:0", "-f", "s16le", "-ac", "1", "-ar", `${rate}`, "pipe:1"], {
+    input: mp3,
+    maxBuffer: 1 << 28,
+  });
+  const samples = new Int16Array(pcm.buffer, pcm.byteOffset, Math.floor(pcm.length / 2));
+  const frame = rate / 100;
+  const frames = Math.floor(samples.length / frame);
+  const threshold = 32768 * 10 ** (-45 / 20);
+  const quiet = Array.from({ length: frames }, (_, f) => {
+    let sum = 0;
+    for (let i = f * frame; i < (f + 1) * frame; i++) sum += samples[i] * samples[i];
+    return Math.sqrt(sum / frame) < threshold;
+  });
+
+  const parts: Int16Array[] = [];
+  const keep = (from: number, to: number) => parts.push(samples.subarray(from * frame, to * frame));
+  for (let f = 0; f < frames; ) {
+    const start = f;
+    const silent = quiet[f];
+    while (f < frames && quiet[f] === silent) f++;
+    if (!silent) {
+      keep(start, f);
+      continue;
+    }
+    // Pauses keep a little of each side; the ends keep just enough not to clip a breath.
+    const allowed = start === 0 ? 5 : f === frames ? 10 : Math.round(maxPause * 100);
+    if (f - start <= allowed) keep(start, f);
+    else {
+      keep(start, start + Math.floor(allowed / 2));
+      keep(f - Math.ceil(allowed / 2), f);
+    }
+  }
+  const out = new Int16Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return execFileSync(
+    "ffmpeg",
+    ["-loglevel", "error", "-f", "s16le", "-ar", `${rate}`, "-ac", "1", "-i", "pipe:0", "-b:a", "48k", "-f", "mp3", "pipe:1"],
+    { input: Buffer.from(out.buffer), maxBuffer: 1 << 28 },
+  );
+}
+
 /** The Google voice, pitch and speed for each line of a task. */
-function plan(task: ListeningTask, pools: Pools) {
+export function plan(task: ListeningTask, pools: Pools) {
   const cast = castVoices(task);
   return task.lines.map((line) => {
     const c = cast[line.speaker]!;
@@ -194,11 +265,12 @@ function plan(task: ListeningTask, pools: Pools) {
       voice: pool[c.index % pool.length],
       pitch: [0, -2.5, 2.5][round],
       rate: Math.round(LEVEL_RATE[task.level] * c.rate * 100) / 100,
+      maxPause: MAX_PAUSE[task.level],
     };
   });
 }
 
-async function synthesize(p: ReturnType<typeof plan>[number]): Promise<Buffer> {
+export async function synthesize(p: ReturnType<typeof plan>[number]): Promise<Buffer> {
   const body = gemini
     ? {
         // Gemini sets the pace from the note, so no speaking rate.
@@ -221,7 +293,8 @@ async function synthesize(p: ReturnType<typeof plan>[number]): Promise<Buffer> {
     headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(body),
   });
-  return Buffer.from(audioContent, "base64");
+  const audio = Buffer.from(audioContent, "base64");
+  return gemini ? tighten(audio, p.maxPause) : audio;
 }
 
 async function readManifest(): Promise<Manifest> {
@@ -303,8 +376,8 @@ async function main() {
     manifest.voices = family;
   }
 
-  // Gemini voices have a lower rate limit than Chirp.
-  const perBatch = gemini ? 2 : 4;
+  // Lines recorded at once. Gemini answers slowly but has a lower rate limit; 429s are retried.
+  const perBatch = Number(args.find((a) => a.startsWith("--parallel="))?.slice("--parallel=".length)) || (gemini ? 2 : 4);
   let done = 0;
   for (const task of todo) {
     const key36 = audioKey(task);

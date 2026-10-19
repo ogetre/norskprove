@@ -38,6 +38,11 @@ export function signedAssertion(sa: ServiceAccount, now = Math.floor(Date.now() 
   return `${header}.${claims}.${b64url(signer.sign(sa.private_key))}`;
 }
 
+/** The service account's project, where Vertex AI requests are billed. */
+export async function projectId(): Promise<string | null> {
+  return (await serviceAccount())?.project_id ?? null;
+}
+
 let cached: { token: string; expires: number } | null = null;
 
 /** A token valid for at least five more minutes, or null when no service account is set up. */

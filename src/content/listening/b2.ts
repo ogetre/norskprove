@@ -941,7 +941,7 @@ export const listeningB2: ListeningTask[] = [
       { speaker: "A", text: "Uten cruiseturistene hadde det ikke vært liv her om sommeren. Butikken, kafeene og guidene lever av dem. Mange unge har flyttet hjem igjen fordi det endelig finnes jobber her." },
       { speaker: "B", text: "Ingen vil stenge for turismen. Men på de travleste dagene kommer det fire skip og over ti tusen passasjerer til en bygd med noen hundre innbyggere. Lokalbefolkningen kommer seg nesten ikke fram, og utslippene fra skipene gir dårlig luft i fjorden." },
       { speaker: "A", text: "Utslippene blir mindre. Det kommer nye krav om at skipene skal være utslippsfrie i verdensarvfjordene." },
-      { speaker: "B", text: "Det er bra, men det løser ikke problemet med trengselen. Jeg mener vi må ha et tak på hvor mange skip som kan komme per dag, og at passasjerene betaler en avgift som går tilbake til lokalsamfunnet." },
+      { speaker: "B", text: "Det er bra, men det løser ikke problemet med trengselen. Jeg mener vi må ha et tak på hvor mange skip som kan komme hver dag, og at passasjerene betaler en avgift som går tilbake til lokalsamfunnet." },
       { speaker: "A", text: "Et tak kan jeg leve med, så lenge det ikke settes for lavt. Men en avgift kan få rederiene til å velge andre havner." },
     ],
     glossary: [
