@@ -14,18 +14,30 @@
  * The default voices are Chirp 3 HD, Google's most natural ones, with many Norwegian voices.
  * --voices=Wavenet uses the older WaveNet voices instead.
  *
+ * --voices=gemini-2.5-pro-tts (or gemini-2.5-flash-tts, gemini-3.1-flash-tts-preview) uses Gemini
+ * voices, which act each line from a director's note: the scene, who speaks, and the pace for the
+ * level. They are paid from the Google Cloud credit, not free, and need a service account instead
+ * of the API key: GOOGLE_SA_JSON (the JSON key) or GOOGLE_APPLICATION_CREDENTIALS (a path to it),
+ * for an account with the Vertex AI User role.
+ *
+ *   npm run audio -- --voices=gemini-2.5-pro-tts --preview --only=time-hos-tannlegen
+ *     writes one joined MP3 per task to .audio-preview/ to listen to, with the player's
+ *     phone/loudspeaker/radio effect, and leaves the site's recordings alone (needs ffmpeg).
+ *
  * Google gives 1 million Chirp 3 HD characters (4 million WaveNet) free each month, and all the
  * tasks together are about 60 000, so recording them costs nothing. To stay well inside that,
  * the script refuses to send more than MAX_CHARS in one run or MONTH_CHARS in one month
  * (counted in .audio-usage.json) unless --allow-more is given.
  */
 
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { listeningTasks } from "../src/content/listening";
-import { audioKey, castVoices, LEVEL_RATE } from "../src/lib/casting";
+import { audioKey, castVoices, effectFor, LEVEL_RATE } from "../src/lib/casting";
 import type { ListeningTask, VoiceGender } from "../src/lib/types";
+import { accessToken } from "./google-auth";
 
 const API = "https://texttospeech.googleapis.com/v1";
 const ROOT = path.resolve(__dirname, "..");
@@ -45,8 +57,13 @@ const allowMore = args.includes("--allow-more");
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length).split(",");
 /** Voice family to use. Chirp 3 HD is free up to 1 million characters a month. */
 const family = args.find((a) => a.startsWith("--voices="))?.slice("--voices=".length) ?? "Chirp3-HD";
-/** Chirp voices don't take a pitch, but they have so many voices that no task needs one. */
-const usesPitch = !family.startsWith("Chirp");
+/** Gemini voices act each line from a director's note. */
+const gemini = family.startsWith("gemini");
+/** Chirp and Gemini voices don't take a pitch, but they have so many voices that no task needs one. */
+const usesPitch = !family.startsWith("Chirp") && !gemini;
+/** Joined previews to listen to instead of the site's recordings. */
+const preview = args.includes("--preview");
+const PREVIEW_DIR = path.join(ROOT, ".audio-preview", family);
 
 /**
  * Reads a KEY=value line from .env.local when the variable isn't set already. Not from .env,
@@ -61,6 +78,18 @@ async function env(name: string): Promise<string | undefined> {
     if (m && m[1] === name) return m[2].replace(/^["']|["']$/g, "");
   }
   return undefined;
+}
+
+/** API key for Chirp and WaveNet; a service account token for Gemini voices, which refuse keys. */
+async function authHeaders(): Promise<Record<string, string>> {
+  if (gemini) {
+    const token = await accessToken();
+    if (!token) throw new Error("Gemini voices need a service account: set GOOGLE_SA_JSON or GOOGLE_APPLICATION_CREDENTIALS.");
+    return { Authorization: `Bearer ${token}` };
+  }
+  const key = await env("GOOGLE_TTS_API_KEY");
+  if (!key) throw new Error("GOOGLE_TTS_API_KEY is missing. Add it to .env.local, see the instructions.");
+  return { "X-Goog-Api-Key": key };
 }
 
 /** Characters sent to Google per month and voice family, so the free limit is never passed. */
@@ -88,13 +117,16 @@ async function call<T>(url: string, init?: RequestInit, tries = 6): Promise<T> {
   }
 }
 
-async function voicePools(key: string): Promise<Pools> {
+async function voicePools(): Promise<Pools> {
   type Voice = { name: string; ssmlGender: string; languageCodes: string[] };
-  const { voices } = await call<{ voices: Voice[] }>(`${API}/voices?languageCode=nb-NO&key=${key}`);
-  const inFamily = voices.filter((v) => v.languageCodes.includes("nb-NO") && v.name.includes(`-${family}-`));
+  const { voices } = await call<{ voices: Voice[] }>(`${API}/voices?languageCode=nb-NO`, { headers: await authHeaders() });
+  // Gemini voices have the same names as Chirp 3 HD's, without the prefix: «Kore», «Puck».
+  const listed = gemini ? "Chirp3-HD" : family;
+  const inFamily = voices.filter((v) => v.languageCodes.includes("nb-NO") && v.name.includes(`-${listed}-`));
+  const name = (v: Voice) => (gemini ? v.name.split("-").pop()! : v.name);
   const pools: Pools = {
-    kvinne: inFamily.filter((v) => v.ssmlGender === "FEMALE").map((v) => v.name).sort(),
-    mann: inFamily.filter((v) => v.ssmlGender === "MALE").map((v) => v.name).sort(),
+    kvinne: inFamily.filter((v) => v.ssmlGender === "FEMALE").map(name).sort(),
+    mann: inFamily.filter((v) => v.ssmlGender === "MALE").map(name).sort(),
   };
   if (!pools.kvinne.length || !pools.mann.length) {
     const names = voices.map((v) => v.name).join(", ");
@@ -119,6 +151,33 @@ export function spoken(text: string): string {
   return text.replace(new RegExp(`\\b([1-9]|[12]\\d|3[01])\\. (?=(?:${MONTHS})\\b)`, "g"), (_, n: string) => `${ORDINALS[Number(n) - 1]} `);
 }
 
+const PACE: Record<ListeningTask["level"], string> = {
+  A1: "slowly and very clearly, with small pauses, as to a beginner",
+  A2: "a little slower than normal and clearly",
+  B1: "at a natural, everyday pace",
+  B2: "at a natural, lively everyday pace, as people really talk",
+};
+
+/** The director's note for a Gemini voice: who is speaking, where, and how. */
+export function direction(task: ListeningTask, speaker: ListeningTask["lines"][number]["speaker"]): string {
+  const who = task.speakers[speaker] ?? "a person";
+  const fx = effectFor(task, speaker);
+  const setting =
+    fx === "pa"
+      ? "It is an announcement over loudspeakers: calm, clear and a little formal."
+      : fx === "radio"
+        ? "It is said on the radio."
+        : fx === "phone" || task.genre === "Telefonsamtale"
+          ? "It is a phone call."
+          : "";
+  return [
+    "Read the transcript aloud in Norwegian bokmål with an Eastern Norwegian accent. Do not read these notes aloud.",
+    `Scene (${task.genre}): ${task.situation} ${setting}`.trim(),
+    `Speaker: ${who}. Show the feelings the situation calls for, as an actor would.`,
+    `Pace: ${PACE[task.level]}. Sound like a real person, not a newsreader.`,
+  ].join("\n");
+}
+
 /** The Google voice, pitch and speed for each line of a task. */
 function plan(task: ListeningTask, pools: Pools) {
   const cast = castVoices(task);
@@ -130,6 +189,8 @@ function plan(task: ListeningTask, pools: Pools) {
     const round = usesPitch ? Math.floor(c.nth / pool.length) % 3 : 0;
     return {
       text: spoken(line.text),
+      prompt: gemini ? direction(task, line.speaker) : undefined,
+      effect: effectFor(task, line.speaker),
       voice: pool[c.index % pool.length],
       pitch: [0, -2.5, 2.5][round],
       rate: Math.round(LEVEL_RATE[task.level] * c.rate * 100) / 100,
@@ -137,20 +198,28 @@ function plan(task: ListeningTask, pools: Pools) {
   });
 }
 
-async function synthesize(key: string, p: ReturnType<typeof plan>[number]): Promise<Buffer> {
-  const { audioContent } = await call<{ audioContent: string }>(`${API}/text:synthesize?key=${key}`, {
+async function synthesize(p: ReturnType<typeof plan>[number]): Promise<Buffer> {
+  const body = gemini
+    ? {
+        // Gemini sets the pace from the note, so no speaking rate.
+        input: { prompt: p.prompt, text: p.text },
+        voice: { languageCode: "nb-NO", name: p.voice, modelName: family },
+        audioConfig: { audioEncoding: "MP3", sampleRateHertz: 24000 },
+      }
+    : {
+        input: { text: p.text },
+        voice: { languageCode: "nb-NO", name: p.voice },
+        audioConfig: {
+          audioEncoding: "MP3",
+          speakingRate: p.rate,
+          ...(p.pitch ? { pitch: p.pitch } : {}),
+          sampleRateHertz: 24000,
+        },
+      };
+  const { audioContent } = await call<{ audioContent: string }>(`${API}/text:synthesize`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      input: { text: p.text },
-      voice: { languageCode: "nb-NO", name: p.voice },
-      audioConfig: {
-        audioEncoding: "MP3",
-        speakingRate: p.rate,
-        ...(p.pitch ? { pitch: p.pitch } : {}),
-        sampleRateHertz: 24000,
-      },
-    }),
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify(body),
   });
   return Buffer.from(audioContent, "base64");
 }
@@ -168,18 +237,48 @@ async function writeManifest(m: Manifest) {
   await writeFile(MANIFEST, JSON.stringify({ voices: m.voices, tasks }, null, 2) + "\n");
 }
 
+const FX: Record<string, string> = {
+  phone: "highpass=f=320,lowpass=f=3300,equalizer=f=1700:t=q:w=1:g=6",
+  pa: "highpass=f=220,lowpass=f=4800,aecho=0.8:0.6:70|140:0.25|0.15",
+  radio: "highpass=f=90,lowpass=f=9000,acompressor",
+};
+
+/** Joins a task's lines into one MP3 with pauses and the player's effects, to listen to. */
+async function writePreview(task: ListeningTask, lines: ReturnType<typeof plan>, audio: Buffer[]) {
+  const dir = path.join(PREVIEW_DIR, task.id);
+  await mkdir(dir, { recursive: true });
+  const parts: string[] = [];
+  for (const [i, buf] of audio.entries()) {
+    const mp3 = path.join(dir, `${i}.mp3`);
+    const wav = path.join(dir, `${i}.wav`);
+    await writeFile(mp3, buf);
+    const pause = i + 1 < lines.length && task.lines[i + 1].speaker === task.lines[i].speaker ? 0.3 : 0.55;
+    const effect = lines[i].effect;
+    const filter = [effect ? FX[effect] : "anull", `apad=pad_dur=${pause}`].join(",");
+    execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", mp3, "-af", filter, "-ar", "24000", "-ac", "1", wav]);
+    parts.push(`file '${wav}'`);
+  }
+  await writeFile(path.join(dir, "list.txt"), parts.join("\n"));
+  const out = path.join(PREVIEW_DIR, `${task.id}.mp3`);
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", path.join(dir, "list.txt"), "-b:a", "96k", out]);
+  await rm(dir, { recursive: true });
+  return out;
+}
+
 async function main() {
   const manifest = await readManifest();
   const sameVoices = manifest.voices === family;
   const todo = listeningTasks.filter((t) => {
     if (only && !only.includes(t.id)) return false;
-    if (force || !sameVoices) return true;
+    if (preview || force || !sameVoices) return true;
     const key = audioKey(t);
     return manifest.tasks[t.id] !== key || !existsSync(path.join(AUDIO_DIR, t.id, `${key}-0.mp3`));
   });
   const chars = todo.reduce((n, t) => n + t.lines.reduce((m, l) => m + l.text.length, 0), 0);
 
-  console.log(`${todo.length} of ${listeningTasks.length} tasks to record, ${chars.toLocaleString("en")} characters, ${family} voices.`);
+  console.log(
+    `${todo.length} of ${listeningTasks.length} tasks to ${preview ? "preview" : "record"}, ${chars.toLocaleString("en")} characters, ${family} voices.`,
+  );
   if (!todo.length) return;
   if (dryRun) {
     console.log("Dry run: nothing was sent to Google.");
@@ -193,41 +292,44 @@ async function main() {
     process.exit(1);
   }
   if (used + chars > MONTH_CHARS && !allowMore) {
-    console.error(`Stopped: this month would pass ${MONTH_CHARS.toLocaleString("en")} characters, close to Google's free limit. Nothing was sent. Wait until next month.`);
+    console.error(`Stopped: this month would pass ${MONTH_CHARS.toLocaleString("en")} characters with ${family}. Nothing was sent. Wait until next month.`);
     process.exit(1);
   }
 
-  const key = await env("GOOGLE_TTS_API_KEY");
-  if (!key) {
-    console.error("GOOGLE_TTS_API_KEY is missing. Add it to .env.local, see the instructions.");
-    process.exit(1);
-  }
-
-  const pools = await voicePools(key);
+  const pools = await voicePools();
   console.log(`Voices: ${[...pools.kvinne, ...pools.mann].join(", ")}`);
-  if (!sameVoices) manifest.tasks = {};
-  manifest.voices = family;
+  if (!preview) {
+    if (!sameVoices) manifest.tasks = {};
+    manifest.voices = family;
+  }
 
+  // Gemini voices have a lower rate limit than Chirp.
+  const perBatch = gemini ? 2 : 4;
   let done = 0;
   for (const task of todo) {
     const key36 = audioKey(task);
     const dir = path.join(AUDIO_DIR, task.id);
-    await mkdir(dir, { recursive: true });
     const lines = plan(task, pools);
-    // A few lines at a time keeps well under Google's rate limit.
-    for (let i = 0; i < lines.length; i += 4) {
-      const batch = lines.slice(i, i + 4);
-      const audio = await Promise.all(batch.map((p) => synthesize(key, p)));
-      await Promise.all(audio.map((buf, j) => writeFile(path.join(dir, `${key36}-${i + j}.mp3`), buf)));
+    const audio: Buffer[] = [];
+    for (let i = 0; i < lines.length; i += perBatch) {
+      const batch = lines.slice(i, i + perBatch);
+      audio.push(...(await Promise.all(batch.map((p) => synthesize(p)))));
       usage[month] = { ...usage[month], [family]: (usage[month]?.[family] ?? 0) + batch.reduce((n, p) => n + p.text.length, 0) };
       await writeFile(USAGE, JSON.stringify(usage, null, 2) + "\n");
     }
+    if (preview) {
+      console.log(`${++done}/${todo.length} ${await writePreview(task, lines, audio)}`);
+      continue;
+    }
+    await mkdir(dir, { recursive: true });
+    await Promise.all(audio.map((buf, i) => writeFile(path.join(dir, `${key36}-${i}.mp3`), buf)));
     // Remove recordings of older versions of the text.
     for (const file of await readdir(dir)) if (!file.startsWith(`${key36}-`)) await rm(path.join(dir, file));
     manifest.tasks[task.id] = key36;
     await writeManifest(manifest);
     console.log(`${++done}/${todo.length} ${task.id}`);
   }
+  if (preview) return;
 
   // Forget tasks that no longer exist.
   const ids = new Set(listeningTasks.map((t) => t.id));
