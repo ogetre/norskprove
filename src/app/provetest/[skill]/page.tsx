@@ -33,9 +33,8 @@ async function TrialPageContent({ params }: { params: PageProps<"/provetest/[ski
     <FreshVisit>
       <TestRunner
         skill={info.skill}
-        mode="trial"
         minutes={info.trialMinutes}
-        stage1={tasks}
+        tasks={tasks}
         backHref="/provetest"
         afterResult={<TrialOffer authEnabled={authEnabled} />}
       />

@@ -1,20 +1,16 @@
 import type { ExamTask, Skill } from "@/lib/types";
-import type { Draw } from "./draw";
 import { listeningTasks, listeningTests } from "./listening";
 import { readingTasks, readingTests } from "./reading";
 
-export type TestPlan = {
-  trial: string[];
-  /** Each full test draws new tasks: stage 1, then the easy or hard stage 2. */
-  full: { minutes: number; stage1: Draw; easy: Draw; hard: Draw };
-};
+/** The tasks of the free trial test. The full tests draw their tasks as they go (see exam-parts). */
+export type TestPlan = { trial: string[] };
 
-type SkillContent = { tasks: ExamTask[]; tests: TestPlan; trialMinutes: number };
+type SkillContent = { tasks: ExamTask[]; tests: TestPlan };
 
 /** Skills with ready-made tasks (reading and listening). Writing and speaking use prompts instead. */
 export const content: Partial<Record<Skill, SkillContent>> = {
-  lesing: { tasks: readingTasks, tests: readingTests, trialMinutes: 10 },
-  lytting: { tasks: listeningTasks, tests: listeningTests, trialMinutes: 10 },
+  lesing: { tasks: readingTasks, tests: readingTests },
+  lytting: { tasks: listeningTasks, tests: listeningTests },
 };
 
 export function getTask(skill: Skill, id: string): ExamTask | undefined {

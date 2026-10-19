@@ -671,13 +671,7 @@ export function getReadingTask(id: string) {
   return readingTasks.find((t) => t.id === id);
 }
 
-/** Task ids for the free trial, and how many tasks per level the adaptive full test draws (two stages like the real exam). */
+/** Task ids for the free trial. */
 export const readingTests = {
   trial: ["nye-apningstider", "kveldskurs", "en-uvanlig-morgen"],
-  full: {
-    minutes: 60,
-    stage1: { A2: 2, B1: 2 },
-    easy: { A1: 3, A2: 3 },
-    hard: { B1: 3, B2: 4 },
-  },
 };
