@@ -1,7 +1,8 @@
 /*
- * An OAuth access token for a Google Cloud service account, for APIs that don't take an API key
- * (Gemini voices in Cloud Text-to-Speech). The key comes from GOOGLE_SA_JSON (the JSON key
- * itself) or GOOGLE_APPLICATION_CREDENTIALS (a path to it). It is never written anywhere.
+ * An OAuth access token for a Google Cloud service account, for APIs that don't take an API key:
+ * Gemini on Vertex AI for the oral test on the server, and the audio and picture scripts. The key
+ * comes from GOOGLE_SA_JSON (the JSON key itself) or GOOGLE_APPLICATION_CREDENTIALS (a path to
+ * it). It is never written anywhere. Not marked server-only, since the scripts run it in Node.
  */
 
 import { createSign } from "node:crypto";

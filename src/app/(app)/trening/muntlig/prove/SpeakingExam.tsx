@@ -11,7 +11,7 @@ import { clearUnfinished, loadUnfinished, saveUnfinished, savedAtLabel } from "@
 
 type Band = { id: string; label: string; parts: string[]; tasks: SpeakingTask[] };
 /** A level band: the name of each part as at Norskprøven, and the prompts each part can draw from. */
-type BandPools = { id: string; label: string; parts: string[]; pools: SpeakingTask[][] };
+export type BandPools = { id: string; label: string; parts: string[]; pools: SpeakingTask[][] };
 type Saved = SessionProgress & { band: { id: string; label: string; tasks: string[] }; savedAt: string };
 
 /** The saved test with its prompts, or null if it is missing, finished or no longer fits the prompts. */
@@ -25,7 +25,8 @@ function restore(saved: Saved | null, pools: BandPools[]): (Saved & { exam: Band
   return { ...saved, exam: { id: saved.band.id, label: saved.band.label, parts, tasks } };
 }
 
-export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
+/** `free` is the learner's free check: the test is then always graded by the AI examiner. */
+export function SpeakingExam({ bands: pools, free = false }: { bands: BandPools[]; free?: boolean }) {
   // A new prompt per part each visit. Paywall mounts this on the client only, so the draw
   // never has to match a server render.
   const [bands] = useState<Band[]>(() => pools.map(({ pools: slots, ...b }) => ({ ...b, tasks: slots.map((p) => shuffle(p)[0]) })));
@@ -53,6 +54,7 @@ export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
         mode="full"
         fullscreen
         title={`Muntlig prøve ${band.label}`}
+        aiRequired={free}
         resume={resume}
         onProgress={save}
         onFinish={finish}
@@ -79,7 +81,7 @@ export function SpeakingExam({ bands: pools }: { bands: BandPools[] }) {
           "Du fortsetter fra neste spørsmål. Lydopptakene fra forrige gang kan ikke spilles av, men svarene dine er tatt vare på.",
         ]}
         onContinue={() => {
-          setResume({ answers: saved.answers, typedMode: saved.typedMode });
+          setResume({ answers: saved.answers, typedMode: saved.typedMode, checkId: saved.checkId });
           setBand(saved.exam);
           setSaved(null);
         }}

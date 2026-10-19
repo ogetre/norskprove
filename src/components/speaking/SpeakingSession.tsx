@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useAccess } from "@/components/Access";
 import { SPEAKING_KIND_NAMES, type SpeakingTask } from "@/content/speaking";
-import { planHasAiFeedback } from "@/lib/plans";
+import { allowanceText, sendAnswer, startCheck, useOralInfo } from "@/lib/oral-check-client";
 import { useRecorder } from "@/lib/recorder";
 import { checkAnswer, scriptedCount as scripted, type Answer } from "@/lib/speaking-checks";
 import { addSpeaking, recordAttempt, useHydrated } from "@/lib/store";
@@ -22,28 +22,8 @@ type Phase = "overview" | "ask" | "think" | "record" | "result";
 const toTurns = (row: Answer[]): SpeakingTurn[] =>
   row.map((a) => ({ question: a.question, answer: a.transcript, ...(a.followUp ? { followUp: true } : {}) }));
 
-/** The AI examiner's follow-up to the last answer, or null when there is none in time. */
-async function fetchFollowUp(taskId: string, row: Answer[]): Promise<string | null> {
-  const abort = new AbortController();
-  const timer = setTimeout(() => abort.abort(), 20_000);
-  try {
-    const res = await fetch("/api/speaking-followup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ taskId, turns: toTurns(row).map(({ question, answer }) => ({ question, answer })) }),
-      signal: abort.signal,
-    });
-    const data = (await res.json().catch(() => null)) as { question?: string } | null;
-    return res.ok && data?.question ? data.question : null;
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 /** Answers so far in a full oral test, saved so it can be continued from the next question. */
-export type SessionProgress = { answers: Answer[][]; typedMode: boolean };
+export type SessionProgress = { answers: Answer[][]; typedMode: boolean; checkId?: string };
 
 function Examiner({ speaking, label }: { speaking: boolean; label: string }) {
   return (
@@ -110,7 +90,18 @@ function CheckList({ checks }: { checks: Check[] }) {
   );
 }
 
-function TaskResult({ task, answers, checks }: { task: SpeakingTask; answers: Answer[]; checks: Check[][] }) {
+function TaskResult({
+  task,
+  answers,
+  heard,
+  checks,
+}: {
+  task: SpeakingTask;
+  answers: Answer[];
+  /** What the AI examiner heard in each answer, once it has graded them. */
+  heard: string[] | null;
+  checks: Check[][];
+}) {
   const voices = useNorwegianVoices();
   const [playing, setPlaying] = useState(false);
   const [ticked, setTicked] = useState(() => task.points.map(() => false));
@@ -133,8 +124,10 @@ function TaskResult({ task, answers, checks }: { task: SpeakingTask; answers: An
             </p>
             {a.url && <audio controls src={a.url} className="mt-3 w-full" />}
             <p className="mt-3 text-[15px] leading-relaxed">
-              <span className="text-sm font-semibold text-granite">{a.typed ? "Svaret ditt (skrevet): " : "Det vi hørte: "}</span>
-              {a.transcript || (
+              <span className="text-sm font-semibold text-granite">
+                {a.typed ? "Svaret ditt (skrevet): " : heard ? "AI-sensoren hørte: " : "Det vi hørte: "}
+              </span>
+              {(a.typed ? a.transcript : (heard?.[i] ?? a.transcript)) || (
                 <span className="text-granite">
                   {a.typed ? "Tomt svar." : "Ingen tekst. Talegjenkjenning virker best i Chrome og Edge. Hør på opptaket ditt."}
                 </span>
@@ -191,6 +184,16 @@ function TaskResult({ task, answers, checks }: { task: SpeakingTask; answers: An
   );
 }
 
+/** What happens to the recordings when the AI examiner hears them. */
+const PRIVACY = "Opptakene sendes til Google Cloud i EU for vurderingen og lagres ikke der.";
+
+/** One level for the whole test from the AI's level for each task: their mean, rounded down. */
+function overallLevel(levels: string[]): string {
+  const order = ["A1", "A2", "B1", "B2", "C1"];
+  const mean = levels.reduce((n, l) => n + Math.max(0, order.indexOf(l)), 0) / levels.length;
+  return order[Math.floor(mean)];
+}
+
 type SessionProps = {
   tasks: SpeakingTask[];
   mode: Mode;
@@ -203,15 +206,24 @@ type SessionProps = {
   onProgress?: (progress: SessionProgress) => void;
   /** Called when the last answer is given. */
   onFinish?: () => void;
+  /** The learner's free check: the AI examiner always grades, and the test can't start without it. */
+  aiRequired?: boolean;
 };
 
-function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, onFinish }: SessionProps) {
+function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, onFinish, aiRequired = false }: SessionProps) {
   const voices = useNorwegianVoices();
   const rec = useRecorder();
-  const { plan, loading, dev } = useAccess();
-  const aiAllowed = dev || planHasAiFeedback(plan);
-  const [followUps, setFollowUps] = useState(true);
-  const ai = aiAllowed && followUps;
+  const oral = useOralInfo();
+  const pathname = usePathname();
+  const [aiWanted, setAiWanted] = useState(true);
+  /** The AI check the session runs under (api/oral-check): the follow-ups and the grading belong to it. */
+  const [check, setCheck] = useState<string | null>(resume?.checkId ?? null);
+  const [checkNote, setCheckNote] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [graded, setGraded] = useState<(string[] | null)[]>(() => tasks.map(() => null));
+  const [levels, setLevels] = useState<(string | null)[]>(() => tasks.map(() => null));
+  const ai = check !== null;
+  const canCheck = oral.state === "ready" && oral.allowance.left !== 0;
   const [answers, setAnswers] = useState<Answer[][]>(() => resume?.answers ?? tasks.map(() => []));
   const [ti, setTi] = useState(() => Math.max(0, answers.findIndex((row, i) => scripted(row) < tasks[i].questions.length)));
   const [qi, setQi] = useState(() => scripted(answers[ti]));
@@ -237,9 +249,9 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
   useEffect(() => {
     const complete = answers.every((row, i) => scripted(row) >= tasks[i].questions.length);
     if (phase !== "result" && !complete) {
-      onProgress?.({ answers: answers.map((row) => row.map((a) => ({ ...a, url: null }))), typedMode });
+      onProgress?.({ answers: answers.map((row) => row.map((a) => ({ ...a, url: null }))), typedMode, ...(check ? { checkId: check } : {}) });
     }
-  }, [answers, tasks, typedMode, phase, onProgress]);
+  }, [answers, tasks, typedMode, phase, onProgress, check]);
 
   useEffect(() => {
     if (phase !== "overview" && phase !== "record") return;
@@ -262,6 +274,13 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
     const res = tasks.map((t, i) => all[i].map((a) => (a.followUp ? [] : checkAnswer(t, a))));
     const ids = tasks.map((t, i) => {
       const flat = res[i].flat();
+      const id = addSpeaking({
+        promptId: t.id,
+        transcript: all[i].map((a) => a.transcript).join(" "),
+        seconds: all[i].reduce((n, a) => n + a.seconds, 0),
+        turns: toTurns(all[i]),
+      });
+      // With AI feedback on the answers, the results chart places them by its level.
       recordAttempt({
         skill: "muntlig",
         taskId: t.id,
@@ -269,13 +288,9 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
         correct: flat.filter((c) => c.ok).length,
         total: Math.max(1, flat.length),
         mode,
+        submissionId: id,
       });
-      return addSpeaking({
-        promptId: t.id,
-        transcript: all[i].map((a) => a.transcript).join(" "),
-        seconds: all[i].reduce((n, a) => n + a.seconds, 0),
-        turns: toTurns(all[i]),
-      });
+      return id;
     });
     setSubmissionIds(ids);
     setResults(res);
@@ -322,16 +337,22 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
       typed: typedMode,
       ...(follow ? { followUp: true } : {}),
     };
-    const next = answers.map((row, i) => (i === ti ? [...row, answer] : row));
+    let next = answers.map((row, i) => (i === ti ? [...row, answer] : row));
     setAnswers(next);
 
-    // Like the examiner at the test, the AI asks one follow-up to each of the task's questions.
-    if (ai && !follow && countWords(answer.transcript) >= 3) {
+    // Like the examiner at the test, the AI hears each answer to the task's own questions and
+    // asks one follow-up. What it heard replaces the browser's transcript.
+    if (check && !follow && (answer.url || countWords(answer.transcript) >= 3)) {
       setPhase("think");
-      const followUp = await fetchFollowUp(task.id, next[ti]);
+      const heard = await sendAnswer(check, task.id, answers[ti], answer, true);
       if (!alive.current) return;
-      if (followUp) {
-        void ask(ti, qi, followUp);
+      if (heard?.transcript && !answer.typed && heard.transcript !== answer.transcript) {
+        const better = { ...answer, transcript: heard.transcript };
+        next = next.map((row, i) => (i === ti ? [...row.slice(0, -1), better] : row));
+        setAnswers(next);
+      }
+      if (heard?.followUp) {
+        void ask(ti, qi, heard.followUp);
         return;
       }
     }
@@ -354,9 +375,32 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
     finishRef.current = () => void finishAnswer();
   });
 
+  /** Starts the first question, and the AI check first when the learner wants one. */
+  const begin = async () => {
+    if (busy.current) return;
+    if ((aiWanted || aiRequired) && !check) {
+      busy.current = true;
+      setStarting(true);
+      const started = await startCheck(tasks.map((t) => t.id));
+      busy.current = false;
+      setStarting(false);
+      if (!alive.current) return;
+      if ("id" in started) setCheck(started.id);
+      else {
+        setCheckNote(started.error);
+        if (aiRequired) return;
+      }
+    }
+    void ask(ti, qi);
+  };
+
+  const fresh = answers.every((row) => row.length === 0);
+
   const remaining = deadline - now;
 
   if (phase === "result" && results) {
+    const passed = results.flat(2).filter((c) => c.ok).length;
+    const overall = check && levels.every(Boolean) ? overallLevel(levels as string[]) : null;
     return (
       <div className="space-y-6">
         <div className="rise relative overflow-hidden rounded-2xl bg-fjord-deep p-7 text-snow sm:p-9">
@@ -366,7 +410,7 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
           <div className="relative">
             <p className="text-mist">{title}</p>
             <p className="mt-2 font-display text-4xl font-medium tracking-tight sm:text-5xl">
-              {results.flat(2).filter((c) => c.ok).length} av {results.flat(2).length} krav
+              {overall ? `Nivå ${overall}` : check ? "AI-sensoren vurderer …" : `${passed} av ${results.flat(2).length} krav`}
             </p>
             <p className="mt-2 text-ice">
               {answers.flat().length} svar
@@ -375,8 +419,8 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
                 : `, ${answers.flat().reduce((n, a) => n + (a.typed ? 0 : a.seconds), 0)} sekunder taletid`}
             </p>
             <p className="mt-4 max-w-lg text-sm leading-relaxed text-mist">
-              {aiAllowed
-                ? "AI-sensoren vurderer grammatikk, ordforråd og hvordan du løser oppgaven. Uttale kan den ikke høre, så lytt også til opptakene dine."
+              {check
+                ? "AI-sensoren har hørt opptakene og vurderer grammatikk, ordforråd, sammenheng og uttale."
                 : "Hør på opptakene dine og sammenlign med eksempelsvarene."}
             </p>
           </div>
@@ -384,8 +428,17 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
         {after}
         {tasks.map((t, i) => (
           <div key={t.id} className="space-y-4">
-            <TaskResult task={t} answers={answers[i]} checks={results[i]} />
-            <SpeakingAiFeedback task={t} turns={toTurns(answers[i])} submissionId={submissionIds[i]} />
+            <TaskResult task={t} answers={answers[i]} heard={graded[i]} checks={results[i]} />
+            <SpeakingAiFeedback
+              task={t}
+              answers={answers[i]}
+              checkId={check}
+              submissionId={submissionIds[i]}
+              onGraded={(g) => {
+                setGraded((prev) => prev.map((x, j) => (j === i ? g.transcripts : x)));
+                setLevels((prev) => prev.map((x, j) => (j === i ? g.feedback.level_estimate : x)));
+              }}
+            />
           </div>
         ))}
       </div>
@@ -436,41 +489,60 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <button
               type="button"
-              onClick={() => void ask(ti, qi)}
-              className="rounded-md bg-rorbu px-6 py-3 font-medium text-white transition-colors hover:bg-[#a03022]"
+              onClick={() => void begin()}
+              disabled={starting}
+              className="rounded-md bg-rorbu px-6 py-3 font-medium text-white transition-colors hover:bg-[#a03022] disabled:opacity-60"
             >
-              Jeg er klar
+              {starting ? "Starter …" : "Jeg er klar"}
             </button>
             <span className="text-sm text-granite tabular-nums">
               {deadline ? `Forberedelse: ${clock(Math.max(0, prepLeft))}` : `${task.prepSeconds} sekunder forberedelse anbefales`}
             </span>
             {typedMode && <span className="text-sm text-warn">Du skriver svarene fordi mikrofonen ikke er tilgjengelig.</span>}
           </div>
-          {aiAllowed ? (
-            <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl bg-snow p-4">
-              <input
-                type="checkbox"
-                checked={followUps}
-                onChange={(e) => setFollowUps(e.target.checked)}
-                className="mt-0.5 size-5 shrink-0 accent-[var(--fjord)]"
-              />
-              <span>
-                <span className="block font-medium">AI-sensoren stiller oppfølgingsspørsmål</span>
-                <span className="text-sm text-granite">
-                  Som på prøven: sensoren spør videre ut fra det du sier, og du må utdype svaret.
+          {check ? (
+            <p className="mt-6 flex items-center gap-2 text-sm text-granite">
+              <span aria-hidden="true" className="size-2 rounded-full bg-moss" />
+              AI-sensoren hører og vurderer denne prøven.
+            </p>
+          ) : aiRequired ? (
+            <p className="mt-6 text-sm leading-relaxed text-granite">
+              AI-sensoren stiller oppfølgingsspørsmål og vurderer prøven. Dette er den gratis vurderingen din. {PRIVACY}
+            </p>
+          ) : fresh && oral.state === "ready" ? (
+            canCheck ? (
+              <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl bg-snow p-4">
+                <input
+                  type="checkbox"
+                  checked={aiWanted}
+                  onChange={(e) => setAiWanted(e.target.checked)}
+                  className="mt-0.5 size-5 shrink-0 accent-[var(--fjord)]"
+                />
+                <span>
+                  <span className="block font-medium">La AI-sensoren høre og vurdere svarene</span>
+                  <span className="text-sm text-granite">
+                    Som på prøven stiller sensoren oppfølgingsspørsmål. Til slutt får du nivå, tilbakemelding på uttalen og
+                    forslag til hvordan du kan si ting bedre. {allowanceText(oral.allowance)} {PRIVACY}
+                  </span>
                 </span>
-              </span>
-            </label>
-          ) : (
-            !loading && (
-              <p className="mt-6 text-sm text-granite">
-                Med Premium stiller AI-sensoren oppfølgingsspørsmål og vurderer svarene dine.{" "}
+              </label>
+            ) : (
+              <p className="mt-6 text-sm leading-relaxed text-granite">
+                {allowanceText(oral.allowance)}{" "}
                 <Link href="/priser" className="font-medium text-fjord underline-offset-4 hover:underline">
-                  Se Premium
+                  Se abonnementer
                 </Link>
               </p>
             )
-          )}
+          ) : fresh && oral.state === "signed-out" ? (
+            <p className="mt-6 text-sm leading-relaxed text-granite">
+              <Link href={`/logg-inn?redirect_url=${encodeURIComponent(pathname)}`} className="font-medium text-fjord underline-offset-4 hover:underline">
+                Logg inn
+              </Link>{" "}
+              for å få svarene vurdert av AI-sensoren. Den første vurderingen er gratis.
+            </p>
+          ) : null}
+          {checkNote && <p className="mt-3 text-sm text-warn">{checkNote}</p>}
           {!typedMode && (
             <button
               type="button"

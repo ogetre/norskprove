@@ -19,7 +19,7 @@ import path from "node:path";
 import { listeningTasks } from "../src/content/listening";
 import { audioKey } from "../src/lib/casting";
 import { addUsage, family, measure, plan, readManifest, synthesize, voicePools, writeManifest } from "./generate-audio";
-import { accessToken, projectId } from "./google-auth";
+import { accessToken, projectId } from "../src/lib/google-auth";
 
 const ROOT = path.resolve(__dirname, "..");
 const AUDIO_DIR = path.join(ROOT, "public/audio/lytting");

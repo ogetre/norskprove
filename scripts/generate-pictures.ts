@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { accessToken, projectId } from "./google-auth";
+import { accessToken, projectId } from "../src/lib/google-auth";
 
 const MODEL = "gemini-2.5-flash-image";
 const DIR = path.resolve(__dirname, "../public/images/muntlig");

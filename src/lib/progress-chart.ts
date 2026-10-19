@@ -32,9 +32,9 @@ export function taskScale(level: Level, share: number): number {
   return clamp(share >= 0.7 ? band + ((share - 0.7) / 0.3) * 0.99 : band - 1 + (share / 0.7) * 0.99);
 }
 
-/** AI feedback places a text by its overall level and the level of each criterion. */
-function feedbackScale(feedback: NonNullable<WritingSubmission["feedback"]>): number {
-  const levels = [feedback.level_estimate, ...feedback.criteria.map((c) => c.level)].filter(
+/** AI feedback places a text or spoken answers by the overall level and the level of each criterion. */
+function feedbackScale(feedback: { level_estimate: string; criteria?: { level: string }[] }): number {
+  const levels = [feedback.level_estimate, ...(feedback.criteria ?? []).map((c) => c.level)].filter(
     (l): l is (typeof FEEDBACK_LEVELS)[number] => (FEEDBACK_LEVELS as readonly string[]).includes(l),
   );
   const mean = levels.reduce((n, l) => n + bandStart(l), 0) / Math.max(1, levels.length);
@@ -53,6 +53,10 @@ function attemptScale(state: AppState, a: Attempt): number {
   if (a.result) return clamp(bandStart(a.result) + 0.5);
   if (a.skill === "skriving") {
     const feedback = submissionFor(state, a)?.feedback;
+    if (feedback) return feedbackScale(feedback);
+  }
+  if (a.skill === "muntlig" && a.submissionId) {
+    const feedback = state.speaking.find((s) => s.id === a.submissionId)?.feedback;
     if (feedback) return feedbackScale(feedback);
   }
   return taskScale(a.level, a.correct / Math.max(1, a.total));
