@@ -103,6 +103,22 @@ async function voicePools(key: string): Promise<Pools> {
   return pools;
 }
 
+const ORDINALS = [
+  "første", "andre", "tredje", "fjerde", "femte", "sjette", "sjuende", "åttende", "niende", "tiende",
+  "ellevte", "tolvte", "trettende", "fjortende", "femtende", "sekstende", "syttende", "attende", "nittende", "tjuende",
+  "tjueførste", "tjueandre", "tjuetredje", "tjuefjerde", "tjuefemte", "tjuesjette", "tjuesjuende", "tjueåttende",
+  "tjueniende", "trettiende", "trettiførste",
+];
+const MONTHS = "januar|februar|mars|april|mai|juni|juli|august|september|oktober|november|desember";
+
+/**
+ * The text as it should be said. Dates are written «17. mai» but said «syttende mai», which
+ * the voices sometimes read as a plain number. Only what is sent to Google changes.
+ */
+export function spoken(text: string): string {
+  return text.replace(new RegExp(`\\b([1-9]|[12]\\d|3[01])\\. (?=(?:${MONTHS})\\b)`, "g"), (_, n: string) => `${ORDINALS[Number(n) - 1]} `);
+}
+
 /** The Google voice, pitch and speed for each line of a task. */
 function plan(task: ListeningTask, pools: Pools) {
   const cast = castVoices(task);
@@ -113,7 +129,7 @@ function plan(task: ListeningTask, pools: Pools) {
     // lower or higher pitch so they still sound like different people.
     const round = usesPitch ? Math.floor(c.nth / pool.length) % 3 : 0;
     return {
-      text: line.text,
+      text: spoken(line.text),
       voice: pool[c.index % pool.length],
       pitch: [0, -2.5, 2.5][round],
       rate: Math.round(LEVEL_RATE[task.level] * c.rate * 100) / 100,
@@ -223,7 +239,7 @@ async function main() {
   console.log("Done.");
 }
 
-main().catch((err: unknown) => {
+if (process.argv[1]?.endsWith("generate-audio.ts")) main().catch((err: unknown) => {
   console.error(err instanceof Error ? err.message : err);
   process.exit(1);
 });
