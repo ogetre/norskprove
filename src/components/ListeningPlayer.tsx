@@ -1,131 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import audio from "@/content/listening/audio.json";
-import { audioKey, castVoices, effectFor, LEVEL_RATE, speakerOrder, type Cast, type Effect } from "@/lib/casting";
+import { castVoices, effectFor, LEVEL_RATE, speakerOrder } from "@/lib/casting";
+import {
+  browserVoices,
+  connectEffects,
+  isRecorded,
+  NATURAL_VOICE,
+  pauseBefore,
+  recordingUrl,
+  wait,
+  type Sound,
+} from "@/lib/listening-audio";
 import { useHydrated } from "@/lib/store";
 import { useNorwegianVoices } from "@/lib/tts";
-import type { ListeningTask, SpeakerId } from "@/lib/types";
+import type { ListeningTask } from "@/lib/types";
 import { InteractiveText } from "./words/InteractiveText";
-
-/** Recorded tasks (npm run audio): task id → version of the text the recording was made from. */
-const recordings = (audio as { tasks: Record<string, string> }).tasks;
-/** The voices the recordings were made with; part of the URL so a browser never plays a cached older voice. */
-const recordedWith = encodeURIComponent((audio as { voices: string | null }).voices ?? "");
 
 /** Playback speeds offered when practising. Tests always play at the exam speed. */
 const SPEEDS = [0.75, 1, 1.25];
-
-/** Pause before a line, a little longer when someone else starts talking. */
-function pauseBefore(task: ListeningTask, i: number): number {
-  if (i === 0) return 0;
-  return task.lines[i].speaker === task.lines[i - 1].speaker ? 300 : 550;
-}
-
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/* ---------- Sound effects for recordings ---------- */
-
-type Sound = { ctx: AudioContext; route: (effect: Effect | undefined) => void };
-
-/**
- * Routes a recording through Web Audio so a line can sound like it comes through a phone, a
- * loudspeaker in a station hall or the radio. Null where Web Audio is missing; the recording
- * then plays as it is.
- */
-function connectEffects(el: HTMLAudioElement): Sound | null {
-  try {
-    const ctx = new AudioContext();
-    const source = ctx.createMediaElementSource(el);
-    const out = ctx.destination;
-    const filter = (type: BiquadFilterType, frequency: number, gain = 0) => {
-      const f = ctx.createBiquadFilter();
-      f.type = type;
-      f.frequency.value = frequency;
-      f.gain.value = gain;
-      return f;
-    };
-    const chain = (...nodes: AudioNode[]) => {
-      nodes.reduce((a, b) => {
-        a.connect(b);
-        return b;
-      });
-      nodes[nodes.length - 1].connect(out);
-      return nodes[0];
-    };
-
-    // A phone line only carries a narrow band of the voice.
-    const phone = chain(filter("highpass", 320), filter("lowpass", 3300), filter("peaking", 1700, 6));
-
-    // A loudspeaker in a hall: thin, with a short echo.
-    const pa = filter("highpass", 220);
-    const paTone = filter("lowpass", 4800);
-    const echo = ctx.createDelay(1);
-    const feedback = ctx.createGain();
-    const wet = ctx.createGain();
-    echo.delayTime.value = 0.13;
-    feedback.gain.value = 0.3;
-    wet.gain.value = 0.35;
-    pa.connect(paTone);
-    paTone.connect(out);
-    paTone.connect(echo);
-    echo.connect(feedback);
-    feedback.connect(echo);
-    echo.connect(wet);
-    wet.connect(out);
-
-    // Radio: a little narrower and evened out.
-    const radio = chain(filter("highpass", 90), filter("lowpass", 9000), ctx.createDynamicsCompressor());
-
-    const inputs: Record<Effect, AudioNode> = { phone, pa, radio };
-    return {
-      ctx,
-      route(effect) {
-        source.disconnect();
-        source.connect(effect ? inputs[effect] : out);
-      },
-    };
-  } catch {
-    return null;
-  }
-}
-
-/* ---------- Browser voices, when a task isn't recorded yet ---------- */
-
-const FEMALE_VOICE = /pernille|iselin|nora|hulda|ida|liv|female|kvinne/i;
-const MALE_VOICE = /finn|jon|henrik|magnus|\bmale\b|\bmann\b/i;
-/** Microsoft Edge has natural Norwegian voices (Pernille, Iselin, Finn) that sound far better. */
-const NATURAL_VOICE = /natural|online/i;
-
-/** Only the natural voices when there are any, so a dialogue doesn't mix good and robotic voices. */
-const best = (list: SpeechSynthesisVoice[]) => {
-  const natural = list.filter((v) => NATURAL_VOICE.test(v.name));
-  return natural.length ? natural : list;
-};
-
-type BrowserVoice = { voice: SpeechSynthesisVoice; pitch: number };
-
-/**
- * A browser voice for each speaker: a woman's or a man's voice when the browser has one. Speakers
- * who have to share a voice get a different pitch, so a dialogue never sounds like one person.
- */
-function browserVoices(task: ListeningTask, cast: Cast, voices: SpeechSynthesisVoice[]) {
-  const female = best(voices.filter((v) => FEMALE_VOICE.test(v.name)));
-  const male = best(voices.filter((v) => MALE_VOICE.test(v.name) && !FEMALE_VOICE.test(v.name)));
-  const shared = new Map<string, number>();
-  const result: Partial<Record<SpeakerId, BrowserVoice>> = {};
-  for (const id of speakerOrder(task)) {
-    const c = cast[id]!;
-    const pool = c.gender === "kvinne" ? female : male;
-    const list = pool.length ? pool : voices;
-    const voice = list[c.index % list.length];
-    const n = shared.get(voice.name) ?? 0;
-    shared.set(voice.name, n + 1);
-    const base = pool.length ? 1 : c.gender === "mann" ? 0.8 : 1.1;
-    result[id] = { voice, pitch: base * [1, 0.86, 1.14][n % 3] };
-  }
-  return result;
-}
 
 /* ---------- Player ---------- */
 
@@ -147,8 +40,7 @@ export function ListeningPlayer({
   const voices = useNorwegianVoices();
   const hydrated = useHydrated();
   const cast = useMemo(() => castVoices(task), [task]);
-  const version = recordings[task.id];
-  const recorded = useMemo(() => version !== undefined && version === audioKey(task), [task, version]);
+  const recorded = useMemo(() => isRecorded(task), [task]);
   const speech = useMemo(() => (voices.length ? browserVoices(task, cast, voices) : {}), [task, cast, voices]);
   const several = speakerOrder(task).length > 1;
 
@@ -198,7 +90,7 @@ export function ListeningPlayer({
       if (sound.current === undefined) sound.current = connectEffects(el);
       void sound.current?.ctx.resume();
       sound.current?.route(effectFor(task, task.lines[i].speaker));
-      el.src = `/audio/lytting/${task.id}/${version}-${i}.mp3?v=${recordedWith}`;
+      el.src = recordingUrl(task, i);
       el.defaultPlaybackRate = speedRef.current;
       el.playbackRate = speedRef.current;
       const done = () => {

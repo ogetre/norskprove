@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { Paywall } from "@/components/Access";
 import { FreshVisit } from "@/components/FreshVisit";
 import { FullTest } from "@/components/FullTest";
+import { ListeningExam } from "@/components/listening/ListeningExam";
 import { content } from "@/content";
-import type { Skill } from "@/lib/types";
+import { isListening, type Skill } from "@/lib/types";
 import { PageLoading } from "@/components/PageLoading";
 
 export const metadata: Metadata = { title: "Full delprøve" };
@@ -19,7 +20,11 @@ async function FullTestPageContent({ params }: { params: PageProps<"/trening/[sk
   return (
     <FreshVisit>
       <Paywall skill={s} feature="Full delprøve">
-        <FullTest skill={s} tasks={c.tasks} plan={c.tests.full} />
+        {s === "lytting" ? (
+          <ListeningExam tasks={c.tasks.filter(isListening)} />
+        ) : (
+          <FullTest skill={s} tasks={c.tasks} plan={c.tests.full} />
+        )}
       </Paywall>
     </FreshVisit>
   );

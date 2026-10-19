@@ -128,8 +128,9 @@ export function SkillHome({
                     Full delprøve
                   </h2>
                   <p className="mt-3 leading-relaxed text-mist">
-                    Som på prøvedagen: {fullMinutes} minutter, tidtaker og to deler. Del 1 avgjør
-                    om du får A1–A2- eller B1–B2-oppgaver i del 2. Du får nivå og gjennomgang til slutt.
+                    {skill === "lytting"
+                      ? "Som lytteprøven på Norskprøven: to forprøver og en hovedprøve på ditt nivå. Lyden spilles av seg selv, to ganger, eller bare én gang på B2, og prøven går videre uten vei tilbake. Du får nivå og gjennomgang til slutt."
+                      : `Som på prøvedagen: ${fullMinutes} minutter, tidtaker og to deler. Del 1 avgjør om du får A1–A2- eller B1–B2-oppgaver i del 2. Du får nivå og gjennomgang til slutt.`}
                   </p>
                   {unfinished && <UnfinishedNote />}
                 </div>
