@@ -5,10 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { Questions } from "@/components/Questions";
 import { ResumeCard } from "@/components/ResumeCard";
 import { Stimulus } from "@/components/Stimulus";
-import { ExamSound } from "@/lib/listening-audio";
+import { ExamSound, questionsRecorded } from "@/lib/listening-audio";
 import {
   answerSeconds,
   bandAfter,
+  briefing,
   drawPart,
   examResult,
   GAP_SECONDS,
@@ -41,44 +42,6 @@ type Saved = {
   task: number;
   savedAt: string;
 };
-
-/** What the instruction before each part says, on screen and aloud. */
-function briefing(kind: PartKind, band: Band | null) {
-  if (kind === "forprove1") {
-    return {
-      title: "Forprøve 1",
-      points: [
-        "Lytteprøven har tre deler: to korte forprøver og en hovedprøve.",
-        "På hver oppgave leser du først spørsmålene. Så hører du lytteteksten to ganger.",
-        "Du kan svare mens du hører. Etterpå får du litt tid til å svare.",
-        "Prøven går videre av seg selv, og du kan ikke gå tilbake.",
-      ],
-      speech:
-        "Velkommen til lytteprøven. Nå starter forprøve nummer én. På hver oppgave leser du først spørsmålene. Så hører du lytteteksten to ganger. Du kan svare mens du hører, og etterpå får du litt tid til å svare. Prøven går videre av seg selv, og du kan ikke gå tilbake.",
-    };
-  }
-  if (kind === "forprove2") {
-    return {
-      title: "Forprøve 2",
-      points: ["Oppgavene her er valgt ut fra svarene dine i forprøve 1.", "Du hører lytteteksten to ganger, som før."],
-      speech: "Nå starter forprøve nummer to. Oppgavene er valgt ut fra svarene dine i den første forprøven. Du hører lytteteksten to ganger, som før.",
-    };
-  }
-  const once = band === "B1–B2";
-  return {
-    title: `Hovedprøven (${band})`,
-    points: [
-      "Hovedprøven er den lengste delen, med rundt tjue spørsmål.",
-      once
-        ? "På oppgaver på nivå B2 hører du lytteteksten bare én gang. Ellers hører du den to ganger."
-        : "Du hører lytteteksten to ganger.",
-      "Noen oppgaver kan føles vanskelige. Ikke gi opp, det kommer lettere oppgaver også.",
-    ],
-    speech: `Nå starter hovedprøven. Den er den lengste delen. ${
-      once ? "På oppgaver på nivå B2 hører du lytteteksten bare én gang. Ellers hører du den to ganger." : "Du hører lytteteksten to ganger."
-    } Hvis en oppgave føles vanskelig, ikke gi opp. Det kommer lettere oppgaver også.`,
-  };
-}
 
 function clock(ms: number) {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -119,6 +82,7 @@ function AudioPanel({
   task,
   step,
   round,
+  hearing,
   left,
   span,
   onSkip,
@@ -126,6 +90,8 @@ function AudioPanel({
   task: ListeningTask;
   step: Step;
   round: number;
+  /** While playing: the questions read aloud, then the recording. */
+  hearing: "questions" | "text";
   left: number;
   span: number;
   onSkip: () => void;
@@ -143,9 +109,11 @@ function AudioPanel({
     step === "read"
       ? `Les spørsmålene. Lyden starter om ${clock(left)}.`
       : step === "play"
-        ? plays === 1
-          ? "Du hører teksten nå. Den spilles bare én gang."
-          : `Du hører teksten nå, ${round}. gang av 2.`
+        ? hearing === "questions"
+          ? "Du hører spørsmålene."
+          : plays === 1
+            ? "Du hører teksten nå. Den spilles bare én gang."
+            : `Du hører teksten nå, ${round}. gang av 2.`
         : step === "gap"
           ? `Teksten spilles en gang til om ${clock(left)}.`
           : `Svar på spørsmålene. Neste oppgave om ${clock(left)}.`;
@@ -217,6 +185,7 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
   const [narrated, setNarrated] = useState(false);
   const [result, setResult] = useState<ExamResult | null>(null);
   const [testing, setTesting] = useState(false);
+  const [hearing, setHearing] = useState<"questions" | "text">("text");
   const used = useRef(new Set<string>());
   const consumed = useRef(0);
   const tick = useRef<() => void>(() => {});
@@ -241,7 +210,8 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
     setIndex(i);
     setRound(1);
     setStep("read");
-    timed(readSeconds(list[i]));
+    // When the questions are read aloud there is less need to read them first.
+    timed(questionsRecorded(list[i]) ? 6 : readSeconds(list[i]));
     setPhase("task");
     top.current?.scrollTo({ top: 0 });
   };
@@ -337,15 +307,21 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
     return () => clearInterval(id);
   }, [phase]);
 
-  // The recording plays by itself, as many times as the level allows.
+  // As in the exam, the questions are read aloud before each playback, then the recording plays by itself.
   useEffect(() => {
     if (phase !== "task" || step !== "play" || !task) return;
     let live = true;
-    void engine()
-      .playTask(task, voicesRef.current)
-      .then((finished) => {
-        if (live && finished) afterPlay();
-      });
+    void (async () => {
+      if (questionsRecorded(task)) {
+        setHearing("questions");
+        if (!(await engine().readQuestions(task)) || !live) return;
+        await new Promise((r) => setTimeout(r, 800));
+        if (!live) return;
+      }
+      setHearing("text");
+      const finished = await engine().playTask(task, voicesRef.current);
+      if (live && finished) afterPlay();
+    })();
     return () => {
       live = false;
       engine().stop();
@@ -655,7 +631,7 @@ export function ListeningExam({ tasks }: { tasks: ListeningTask[] }) {
 
       <main className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-8 lg:grid-cols-[1fr_1.15fr] lg:gap-12">
         <section aria-label="Lytteteksten" className="lg:sticky lg:top-28 lg:self-start">
-          <AudioPanel task={task} step={step} round={round} left={left} span={span} onSkip={() => {
+          <AudioPanel task={task} step={step} round={round} hearing={hearing} left={left} span={span} onSkip={() => {
             consumed.current = deadline;
             setStep("play");
           }} />

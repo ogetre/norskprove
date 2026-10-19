@@ -2,6 +2,7 @@
 
 import audio from "@/content/listening/audio.json";
 import { audioKey, castVoices, effectFor, LEVEL_RATE, speakerOrder, type Cast, type Effect } from "./casting";
+import { narrationUrl } from "./narration";
 import type { ListeningTask, SpeakerId } from "./types";
 
 /*
@@ -136,6 +137,11 @@ export function browserVoices(task: ListeningTask, cast: Cast, voices: SpeechSyn
   return result;
 }
 
+/** Whether every question of the task is recorded, so the exam can read them aloud. */
+export function questionsRecorded(task: ListeningTask): boolean {
+  return task.questions.every((q) => narrationUrl(q.prompt) !== null);
+}
+
 /* ---------- The exam's sound, which plays tasks without the learner pressing play ---------- */
 
 /** A tenth of a second of silence, to unlock the audio element inside a click. */
@@ -262,9 +268,28 @@ export class ExamSound {
     return true;
   }
 
-  /** Reads an instruction aloud with the best Norwegian voice the browser has. */
+  /** Reads the task's questions aloud from their recordings. Resolves with false when it was stopped. */
+  async readQuestions(task: ListeningTask): Promise<boolean> {
+    const id = ++this.run;
+    for (const [i, q] of task.questions.entries()) {
+      const url = narrationUrl(q.prompt);
+      if (!url) continue;
+      if (i > 0) await wait(500);
+      if (id !== this.run) return false;
+      await this.playFile(url, undefined);
+      if (id !== this.run) return false;
+    }
+    return true;
+  }
+
+  /** Reads an instruction aloud: its recording, or else the best Norwegian voice the browser has. */
   async say(text: string, voices: SpeechSynthesisVoice[]): Promise<boolean> {
     const id = ++this.run;
+    const url = narrationUrl(text);
+    if (url) {
+      await this.playFile(url, undefined);
+      return id === this.run;
+    }
     const voice = best(voices.filter((v) => FEMALE_VOICE.test(v.name)))[0] ?? best(voices)[0] ?? null;
     if (!voice) {
       // No Norwegian voice: give the learner time to read the text instead.

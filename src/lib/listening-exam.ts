@@ -150,3 +150,51 @@ export function examResult(tasks: ListeningTask[], answers: Answer[][]): ExamRes
   const into = nextShare !== null ? nextShare / PASS : (shareOf(level)! - PASS) / (1 - PASS);
   return { level, scale: bandStart(level) + Math.max(0, Math.min(0.99, into * 0.99)), ...all, byLevel };
 }
+
+/** What the instruction before each part says, on screen and aloud. */
+export function briefing(kind: PartKind, band: Band | null) {
+  if (kind === "forprove1") {
+    return {
+      title: "Forprøve 1",
+      points: [
+        "Lytteprøven har tre deler: to korte forprøver og en hovedprøve.",
+        "På hver oppgave leser du først spørsmålene. Så hører du lytteteksten to ganger.",
+        "Du kan svare mens du hører. Etterpå får du litt tid til å svare.",
+        "Prøven går videre av seg selv, og du kan ikke gå tilbake.",
+      ],
+      speech:
+        "Velkommen til lytteprøven. Nå starter forprøve nummer én. På hver oppgave leser du først spørsmålene. Så hører du lytteteksten to ganger. Du kan svare mens du hører, og etterpå får du litt tid til å svare. Prøven går videre av seg selv, og du kan ikke gå tilbake.",
+    };
+  }
+  if (kind === "forprove2") {
+    return {
+      title: "Forprøve 2",
+      points: ["Oppgavene her er valgt ut fra svarene dine i forprøve 1.", "Du hører lytteteksten to ganger, som før."],
+      speech: "Nå starter forprøve nummer to. Oppgavene er valgt ut fra svarene dine i den første forprøven. Du hører lytteteksten to ganger, som før.",
+    };
+  }
+  const once = band === "B1–B2";
+  return {
+    title: `Hovedprøven (${band})`,
+    points: [
+      "Hovedprøven er den lengste delen, med rundt tjue spørsmål.",
+      once
+        ? "På oppgaver på nivå B2 hører du lytteteksten bare én gang. Ellers hører du den to ganger."
+        : "Du hører lytteteksten to ganger.",
+      "Noen oppgaver kan føles vanskelige. Ikke gi opp, det kommer lettere oppgaver også.",
+    ],
+    speech: `Nå starter hovedprøven. Den er den lengste delen. ${
+      once ? "På oppgaver på nivå B2 hører du lytteteksten bare én gang. Ellers hører du den to ganger." : "Du hører lytteteksten to ganger."
+    } Hvis en oppgave føles vanskelig, ikke gi opp. Det kommer lettere oppgaver også.`,
+  };
+}
+
+/** Every instruction the exam can read aloud, for recording them. */
+export function briefingSpeeches(): string[] {
+  return [
+    briefing("forprove1", null).speech,
+    briefing("forprove2", null).speech,
+    briefing("hoved", "A1–A2").speech,
+    briefing("hoved", "B1–B2").speech,
+  ];
+}
