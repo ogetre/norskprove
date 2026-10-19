@@ -45,3 +45,6 @@ next-env.d.ts
 
 # Non-secret defaults are safe to commit; secrets stay in .env.local
 !.env
+
+# Voice previews from npm run audio -- --preview
+.audio-preview/
