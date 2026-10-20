@@ -10,6 +10,8 @@ export type PlanId = "start" | "pluss" | "premium";
 export const FREE_BETA = true;
 /** AI checks of the oral test a month for every account during the beta. */
 export const BETA_ORAL_CHECKS = 5;
+/** Texts the AI feedback grades a month for every account during the beta. */
+export const BETA_WRITING_CHECKS = 5;
 
 /** Which parts of the exam each plan unlocks. */
 export const PLAN_SKILLS: Record<PlanId, Skill[]> = {
@@ -26,6 +28,14 @@ export function planCovers(plan: PlanId | null, skill: Skill): boolean {
 export function planHasAiFeedback(plan: PlanId | null): boolean {
   return FREE_BETA || plan === "premium";
 }
+
+/** How many texts the AI feedback grades a month: no limit (null) in Premium, a few in the beta. */
+export function writingFeedbackLimit(plan: PlanId | null): number | null {
+  return plan === "premium" ? null : BETA_WRITING_CHECKS;
+}
+
+/** How much AI feedback on texts the learner has this month; `limit` and `left` are null for no limit. */
+export type WritingAllowance = { limit: number | null; used: number; left: number | null };
 
 /**
  * AI checks of the oral test a month in each plan (an oral test or a practice task each); null

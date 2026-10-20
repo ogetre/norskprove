@@ -1,6 +1,9 @@
+import { auth } from "@clerk/nextjs/server";
 import { getWritingTask } from "@/content/writing";
-import { fail, withAiLimits } from "@/lib/ai-route";
+import { fail, withAiLimits, writingAllowance } from "@/lib/ai-route";
+import { authEnabled } from "@/lib/auth-config";
 import { isLanguage } from "@/lib/languages";
+import { activePlan } from "@/lib/subscription";
 import { assessWriting } from "@/lib/writing-ai";
 import { countWords } from "@/lib/writing-checks";
 
@@ -29,5 +32,13 @@ export async function POST(req: Request) {
 
   return withAiLimits("feedback", async (onUsage) => ({ feedback: await assessWriting(task, text, lang, onUsage) }), {
     premium: true,
+    monthly: true,
   });
+}
+
+/** How many texts the learner can still have graded this month. */
+export async function GET() {
+  const userId = authEnabled ? (await auth()).userId : null;
+  if (!userId) return fail("Logg inn for å bruke dette.", 401);
+  return Response.json({ allowance: await writingAllowance(userId, await activePlan(userId)) });
 }

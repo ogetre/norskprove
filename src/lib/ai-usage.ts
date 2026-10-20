@@ -42,11 +42,28 @@ const siteDailyBudget = () => envNumber("AI_DAILY_BUDGET_USD", 1);
 
 const userRow = (userId: string, kind: AiKind) => (kind === "feedback" ? userId : `${userId}:${kind}`);
 const siteRow = (kind: AiKind) => (kind === "feedback" ? TOTAL : `${TOTAL}:${kind}`);
+/** The user's texts graded this month, in a row dated the first of the month. */
+const monthRow = (userId: string) => `${userId}:month`;
 
-export type Reservation = "ok" | "user-limit" | "site-limit";
+export type Reservation = "ok" | "user-limit" | "month-limit" | "site-limit";
 
-/** Takes one request from the user's and the site's daily allowance. */
-export async function reserveCheck(userId: string, kind: AiKind = "feedback"): Promise<Reservation> {
+/** How many texts the user has had graded this month. */
+export async function monthlyFeedbackUsed(userId: string): Promise<number> {
+  await ensureSchema();
+  const [row] = await sql()`
+    SELECT requests FROM ai_usage WHERE user_id = ${monthRow(userId)} AND day = date_trunc('month', current_date)::date`;
+  return row?.requests ?? 0;
+}
+
+/**
+ * Takes one request from the user's and the site's daily allowance, and with `monthly` one of
+ * the texts the user can have graded this month.
+ */
+export async function reserveCheck(
+  userId: string,
+  kind: AiKind = "feedback",
+  monthly: number | null = null,
+): Promise<Reservation> {
   await ensureSchema();
   const db = sql();
 
@@ -56,12 +73,26 @@ export async function reserveCheck(userId: string, kind: AiKind = "feedback"): P
     FROM ai_usage WHERE day = current_date AND starts_with(user_id, ${TOTAL})`;
   if (Number(spent.usd) >= siteDailyBudget()) return "site-limit";
 
+  const month = monthly !== null;
+  if (month) {
+    const taken = await db`
+      INSERT INTO ai_usage (user_id, day, requests)
+      SELECT ${monthRow(userId)}, date_trunc('month', current_date)::date, 1 WHERE ${monthly}::int > 0
+      ON CONFLICT (user_id, day) DO UPDATE SET requests = ai_usage.requests + 1
+      WHERE ai_usage.requests < ${monthly}::int
+      RETURNING requests`;
+    if (taken.length === 0) return "month-limit";
+  }
+
   const user = await db`
     INSERT INTO ai_usage (user_id, day, requests) VALUES (${userRow(userId, kind)}, current_date, 1)
     ON CONFLICT (user_id, day) DO UPDATE SET requests = ai_usage.requests + 1
     WHERE ai_usage.requests < ${LIMITS[kind].user}
     RETURNING requests`;
-  if (user.length === 0) return "user-limit";
+  if (user.length === 0) {
+    if (month) await releaseCheck(userId, kind, { user: false, site: false, month });
+    return "user-limit";
+  }
 
   const site = await db`
     INSERT INTO ai_usage (user_id, day, requests) VALUES (${siteRow(kind)}, current_date, 1)
@@ -69,7 +100,7 @@ export async function reserveCheck(userId: string, kind: AiKind = "feedback"): P
     WHERE ai_usage.requests < ${LIMITS[kind].site()}
     RETURNING requests`;
   if (site.length === 0) {
-    await releaseCheck(userId, kind, false);
+    await releaseCheck(userId, kind, { site: false, month });
     return "site-limit";
   }
   return "ok";
@@ -83,9 +114,18 @@ export async function recordTokens(userId: string, input: number, output: number
     WHERE day = current_date AND user_id IN (${userRow(userId, kind)}, ${siteRow(kind)})`;
 }
 
-/** Gives a request back when Claude was never reached, so nothing was billed. */
-export async function releaseCheck(userId: string, kind: AiKind = "feedback", site = true) {
+/**
+ * Gives a request back when Claude was never reached, so nothing was billed: from the user's
+ * day, the site's day and, when it was taken, the user's month.
+ */
+export async function releaseCheck(
+  userId: string,
+  kind: AiKind = "feedback",
+  { user = true, site = true, month = false }: { user?: boolean; site?: boolean; month?: boolean } = {},
+) {
+  const today = [user && userRow(userId, kind), site && siteRow(kind)].filter((r): r is string => Boolean(r));
   await sql()`
     UPDATE ai_usage SET requests = GREATEST(requests - 1, 0)
-    WHERE day = current_date AND user_id IN (${userRow(userId, kind)}, ${site ? siteRow(kind) : userRow(userId, kind)})`;
+    WHERE (day = current_date AND user_id = ANY(${today}::text[]))
+      OR (${month}::boolean AND user_id = ${monthRow(userId)} AND day = date_trunc('month', current_date)::date)`;
 }

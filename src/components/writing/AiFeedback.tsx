@@ -9,7 +9,13 @@ import { locateErrors, type LocatedError } from "@/lib/error-spans";
 import { FEEDBACK_LEVELS, topicName, type FeedbackLevel } from "@/lib/feedback-topics";
 import { textLang } from "@/lib/languages";
 import { useNativeLanguage } from "@/lib/native-language";
-import { FREE_BETA, planHasAiFeedback } from "@/lib/plans";
+import {
+  BETA_WRITING_CHECKS,
+  FREE_BETA,
+  planHasAiFeedback,
+  writingFeedbackLimit,
+  type WritingAllowance,
+} from "@/lib/plans";
 import { attachWritingFeedback, useAppState } from "@/lib/store";
 import type { WritingFeedback } from "@/lib/types";
 import { countWords } from "@/lib/writing-checks";
@@ -76,11 +82,16 @@ export function AiFeedback({
   const saved = useAppState().writing.find((w) => submissionId && w.id === submissionId)?.feedback;
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [round, setRound] = useState(0);
+  const [asked, setAsked] = useState(false);
 
   const allowed = !trial && (dev || (signedIn && planHasAiFeedback(plan)));
   const enough = countWords(text) >= 5;
-  const wanted = !loading && allowed && enough && !saved;
   const key = submissionId ?? `${task.id}:${text}`;
+  // With no limit the text is graded right away; with a monthly number the learner asks for it.
+  const unlimited = writingFeedbackLimit(plan) === null;
+  const requested = unlimited || asked || requests.has(key);
+  const wanted = !loading && allowed && enough && !saved && requested;
+  const allowance = useWritingAllowance(!loading && signedIn && allowed && enough && !saved && !unlimited);
 
   useEffect(() => {
     if (!wanted) return;
@@ -135,6 +146,7 @@ export function AiFeedback({
     );
   }
   if (loading) return <Skeleton />;
+  if (!requested) return <Offer allowance={allowance} onAsk={() => setAsked(true)} />;
   return (
     <AiPending
       startedAt={startedAt.get(key)}
@@ -144,6 +156,54 @@ export function AiFeedback({
       title="AI-sensoren leser teksten din"
       note="Du får feilene rettet og forklart, og en vurdering av nivået."
     />
+  );
+}
+
+/** How many texts the learner can still have graded this month: undefined while loading, null if unknown. */
+function useWritingAllowance(enabled: boolean): WritingAllowance | null | undefined {
+  const [allowance, setAllowance] = useState<WritingAllowance | null | undefined>(undefined);
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    fetch("/api/writing-feedback", { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<{ allowance?: WritingAllowance }>) : null))
+      .catch(() => null)
+      .then((data) => {
+        if (live) setAllowance(data?.allowance ?? null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [enabled]);
+  return enabled ? allowance : null;
+}
+
+function Offer({ allowance, onAsk }: { allowance: WritingAllowance | null | undefined; onAsk: () => void }) {
+  const left = allowance?.left;
+  return (
+    <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-surface p-6 ring-1 ring-ice sm:p-7">
+      <div className="max-w-xl">
+        <h2 className="text-xl font-semibold">Tilbakemelding fra AI-sensoren</h2>
+        <p className="mt-1 text-sm leading-relaxed text-granite">
+          AI-sensoren finner feilene i teksten din, forklarer reglene og vurderer hvilket nivå teksten viser.{" "}
+          {allowance && left !== null && left !== undefined
+            ? left > 0
+              ? `Du har ${left} av ${allowance.limit} vurderinger igjen denne måneden. Denne teksten bruker én.`
+              : `Du har brukt de ${allowance.limit} vurderingene dine denne måneden. Du får nye neste måned.`
+            : null}
+        </p>
+      </div>
+      {left !== 0 && (
+        <button
+          type="button"
+          onClick={onAsk}
+          disabled={allowance === undefined}
+          className="rounded-md bg-ink px-5 py-2.5 font-medium text-snow transition-colors hover:bg-fjord disabled:opacity-50"
+        >
+          Få tilbakemelding
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -172,7 +232,9 @@ function Upsell({ trial, signedIn }: { trial: boolean; signedIn: boolean }) {
           <h2 className="text-lg font-semibold">Få gratis tilbakemelding fra AI-sensoren</h2>
           <p className="mt-1 text-sm leading-relaxed">
             AI-sensoren finner feilene i teksten din, forklarer reglene og vurderer hvilket nivå teksten viser.{" "}
-            {signedIn ? "Skriv en tekst under Skriving for å få den." : "Det er gratis mens tjenesten er i beta. Du trenger bare en konto."}
+            {signedIn
+              ? "Skriv en tekst under Skriving for å få den."
+              : `Mens tjenesten er i beta, får alle med konto ${BETA_WRITING_CHECKS} tekster vurdert gratis i måneden.`}
           </p>
         </div>
         <Link

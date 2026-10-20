@@ -2,6 +2,7 @@ import { getSpeakingTask } from "@/content/speaking";
 import { fail } from "@/lib/ai-route";
 import { hasOpenCheck, oralAllowance, startOralCheck } from "@/lib/oral-checks";
 import { oralUser } from "@/lib/oral-route";
+import { oralQuota } from "@/lib/plans";
 import { vertexReady } from "@/lib/vertex";
 
 /** Whether AI checks of the oral test work, how many the learner has left, and whether one is open. */
@@ -28,7 +29,9 @@ export async function POST(req: Request) {
   if (started === "site-limit") return fail("AI-vurderingen er stengt resten av dagen. Prøv igjen i morgen.", 503);
   if (started === "used-up") {
     return fail(
-      user.plan ? "Du har brukt AI-vurderingene dine denne måneden." : "Du har brukt den gratis AI-vurderingen din.",
+      oralQuota(user.plan).free
+        ? "Du har brukt den gratis AI-vurderingen din."
+        : "Du har brukt AI-vurderingene dine denne måneden. Du får nye neste måned.",
       403,
     );
   }
