@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { COMPANY, LEGAL_UPDATED } from "@/lib/company";
 import { authEnabled } from "@/lib/auth-config";
+import { FREE_BETA } from "@/lib/plans";
 import { PublicHeader } from "./PublicHeader";
 import { SiteFooter } from "./SiteFooter";
 
@@ -49,22 +50,30 @@ export function CompanyField({ field }: { field: keyof typeof COMPANY }) {
   return <span className="rounded bg-note px-1.5 py-0.5 text-sm text-note-ink">{label} fylles inn</span>;
 }
 
-/** The company's details as a block, for the contact page and the terms. */
+/**
+ * The company's details as a block, for the contact page and the terms. While the service is a
+ * free beta there is no business yet, so an empty organisation number and address are left out.
+ */
 export function CompanyDetails() {
+  const business = !FREE_BETA || COMPANY.orgNr || COMPANY.address;
   return (
     <dl className="grid gap-x-6 gap-y-2 rounded-xl bg-surface p-5 ring-1 ring-ice sm:grid-cols-[10rem_1fr]">
       <dt className="text-granite">Tjenesten drives av</dt>
       <dd className="font-medium">
         <CompanyField field="name" />
       </dd>
-      <dt className="text-granite">Organisasjonsnummer</dt>
-      <dd>
-        <CompanyField field="orgNr" />
-      </dd>
-      <dt className="text-granite">Adresse</dt>
-      <dd>
-        <CompanyField field="address" />
-      </dd>
+      {business && (
+        <>
+          <dt className="text-granite">Organisasjonsnummer</dt>
+          <dd>
+            <CompanyField field="orgNr" />
+          </dd>
+          <dt className="text-granite">Adresse</dt>
+          <dd>
+            <CompanyField field="address" />
+          </dd>
+        </>
+      )}
       <dt className="text-granite">E-post</dt>
       <dd>
         <CompanyField field="email" />

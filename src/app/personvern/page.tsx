@@ -63,6 +63,12 @@ export default function PrivacyPage() {
             <strong>Tekniske data.</strong> Serverne registrerer IP-adresse og nettleser når du bruker tjenesten, for
             drift, feilsøking og sikkerhet. Grunnlaget er vår berettigede interesse.
           </li>
+          <li>
+            <strong>Besøksstatistikk.</strong> Vi teller hvilke sider som blir besøkt, og hvor besøkende kommer fra
+            (land, enhetstype, nettleser og nettstedet som lenket hit), med Vercel Web Analytics. Statistikken bruker
+            ingen informasjonskapsler og kan ikke knyttes til deg eller kontoen din. Vi bruker den til å se hvilke deler
+            av tjenesten som er nyttige. Grunnlaget er vår berettigede interesse.
+          </li>
         </List>
         <p>
           Vi bruker ikke opplysningene dine til reklame, og vi selger dem aldri. AI-leverandørene bruker ikke det du
@@ -73,8 +79,8 @@ export default function PrivacyPage() {
       <Section title="Informasjonskapsler og lagring i nettleseren">
         <p>
           Vi bruker bare informasjonskapsler som trengs for innloggingen. Fremgangen din og innstillinger som fargetema
-          og morsmål lagres i nettleserens lokale lagring. Vi bruker ingen informasjonskapsler til reklame eller sporing,
-          og derfor ber vi ikke om samtykke til dem.
+          og morsmål lagres i nettleserens lokale lagring. Besøksstatistikken bruker ingen informasjonskapsler. Vi bruker
+          ingen informasjonskapsler til reklame eller sporing, og derfor ber vi ikke om samtykke til dem.
         </p>
       </Section>
 
@@ -82,7 +88,7 @@ export default function PrivacyPage() {
         <p>Vi bruker disse leverandørene, som behandler opplysninger på våre vegne etter avtale med oss:</p>
         <List>
           <li>
-            <strong>Vercel</strong> (USA): drift av nettstedet og serverne.
+            <strong>Vercel</strong> (USA): drift av nettstedet og serverne, og besøksstatistikken.
           </li>
           <li>
             <strong>Neon</strong> (USA): databasen med konto-ID, fremgang og abonnement.

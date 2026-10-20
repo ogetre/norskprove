@@ -10,6 +10,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TaskDemo } from "@/components/TaskDemo";
 import { authEnabled } from "@/lib/auth-config";
+import { FREE_BETA } from "@/lib/plans";
 
 const iconProps = {
   width: 28,
@@ -175,6 +176,14 @@ export default function Home() {
                   Prøv en oppgave her
                 </a>
               </div>
+              {FREE_BETA && (
+                <p className="rise mt-5 text-sm text-granite" style={{ animationDelay: "320ms" }}>
+                  Hele tjenesten er gratis mens vi tester.{" "}
+                  <Link href="/priser" className="font-medium text-fjord underline-offset-4 hover:underline">
+                    Les mer
+                  </Link>
+                </p>
+              )}
             </div>
 
             <div id="demo" className="rise scroll-mt-24" style={{ animationDelay: "200ms" }}>
@@ -351,7 +360,9 @@ export default function Home() {
               <p className="font-display text-3xl font-medium tracking-tight sm:text-5xl">
                 Lykke til på prøven!
               </p>
-              <p className="mt-3 text-mist">Start forberedelsene i dag.</p>
+              <p className="mt-3 text-mist">
+                {FREE_BETA ? "Start forberedelsene i dag. Alt er gratis mens vi tester." : "Start forberedelsene i dag."}
+              </p>
             </div>
             <div className="r-up self-start md:self-auto" style={v({ "--i": 1 })}>
               <Link href="/provetest" className={ctaPrimary}>

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { SPEAKING_KIND_NAMES, type SpeakingTask } from "@/content/speaking";
 import { allowanceText, sendAnswer, startCheck, useOralInfo } from "@/lib/oral-check-client";
+import { FREE_BETA } from "@/lib/plans";
 import { useRecorder } from "@/lib/recorder";
 import { checkAnswer, scriptedCount as scripted, type Answer } from "@/lib/speaking-checks";
 import { addSpeaking, recordAttempt, useHydrated } from "@/lib/store";
@@ -536,9 +537,13 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
             ) : (
               <p className="mt-6 text-sm leading-relaxed text-granite">
                 {allowanceText(oral.allowance)}{" "}
-                <Link href="/priser" className="font-medium text-fjord underline-offset-4 hover:underline">
-                  Se abonnementer
-                </Link>
+                {FREE_BETA ? (
+                  "Du får nye neste måned."
+                ) : (
+                  <Link href="/priser" className="font-medium text-fjord underline-offset-4 hover:underline">
+                    Se abonnementer
+                  </Link>
+                )}
               </p>
             )
           ) : fresh && oral.state === "signed-out" ? (

@@ -2,6 +2,7 @@
 
 import { Show } from "@clerk/nextjs";
 import Link from "next/link";
+import { FREE_BETA } from "@/lib/plans";
 
 const perks = [
   "Alle oppgavetyper i lesing, lytting, skriving og muntlig",
@@ -9,7 +10,30 @@ const perks = [
   "Graf som viser fremgangen din",
 ];
 
+const primary = "rounded-md bg-rorbu px-5 py-3 font-medium text-white transition-colors hover:bg-[#a03022]";
+const secondary = "rounded-md px-5 py-3 font-medium text-ink ring-1 ring-ice transition-colors hover:bg-ice";
+
 function Actions({ signedIn }: { signedIn: boolean }) {
+  if (FREE_BETA) {
+    return (
+      <div className="mt-6 flex flex-wrap gap-3">
+        {signedIn ? (
+          <Link href="/trening" className={primary}>
+            Gå til treningen
+          </Link>
+        ) : (
+          <>
+            <Link href="/registrer?redirect_url=/trening" className={primary}>
+              Lag gratis konto
+            </Link>
+            <Link href="/trening" className={secondary}>
+              Øv uten konto
+            </Link>
+          </>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="mt-6 flex flex-wrap gap-3">
       {signedIn ? (
@@ -41,7 +65,9 @@ export function TrialOffer({ authEnabled }: { authEnabled: boolean }) {
         Vil du øve videre?
       </h2>
       <p className="mt-2 leading-relaxed text-granite">
-        Logg inn og velg et abonnement for å trene på det du trenger mest fram til prøven.
+        {FREE_BETA
+          ? "Alt er gratis mens NorskprøveKlar er i beta. Med en gratis konto lagres fremgangen din, og du får tilbakemelding fra AI-sensoren."
+          : "Logg inn og velg et abonnement for å trene på det du trenger mest fram til prøven."}
       </p>
       <ul className="mt-5 space-y-2">
         {perks.map((p) => (

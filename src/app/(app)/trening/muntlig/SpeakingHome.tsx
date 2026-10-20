@@ -40,8 +40,8 @@ export function SpeakingHome({ groups }: { groups: Group[] }) {
               Øv på én oppgave
             </h2>
             <p className="mt-1 max-w-2xl text-granite">
-              Du hører spørsmålet, svarer muntlig og kan lytte til opptaket ditt etterpå. Med Premium stiller AI-sensoren
-              oppfølgingsspørsmål og vurderer svarene dine.
+              Du hører spørsmålet, svarer muntlig og kan lytte til opptaket ditt etterpå. Når du er logget inn, kan
+              AI-sensoren stille oppfølgingsspørsmål og vurdere svarene dine, også uttalen.
             </p>
           </div>
           <LevelFilter value={level} onChange={setLevel} counts={levelCounts(groups.flatMap((g) => g.tasks))} />
