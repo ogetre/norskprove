@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PublicHeader } from "@/components/PublicHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 import { authEnabled } from "@/lib/auth-config";
 import { PLANS } from "@/lib/plans";
 import { PlanButton } from "./PlanButton";
@@ -63,10 +65,16 @@ export default function PricingPage() {
           ))}
         </ul>
 
-        <p className="mt-12 text-center text-sm text-granite">
-          Prisene er i norske kroner og inkluderer mva. Betaling skjer trygt med kort.
+        <p className="mx-auto mt-12 max-w-xl text-center text-sm leading-relaxed text-granite">
+          Prisene er i norske kroner og inkluderer mva. Betaling skjer trygt med kort. Abonnementet fornyes hver måned
+          til du sier det opp, og du har 14 dagers angrerett. Les{" "}
+          <Link href="/vilkar" className="font-medium text-fjord underline-offset-4 hover:underline">
+            salgsvilkårene
+          </Link>
+          .
         </p>
       </main>
+      <SiteFooter />
     </>
   );
 }
