@@ -220,6 +220,7 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
   const [check, setCheck] = useState<string | null>(resume?.checkId ?? null);
   const [checkNote, setCheckNote] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  /** What Gemini heard in each task's answers; stays null when Claude graded the browser's transcript. */
   const [graded, setGraded] = useState<(string[] | null)[]>(() => tasks.map(() => null));
   const [levels, setLevels] = useState<(string | null)[]>(() => tasks.map(() => null));
   const ai = check !== null;
@@ -419,9 +420,13 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
                 : `, ${answers.flat().reduce((n, a) => n + (a.typed ? 0 : a.seconds), 0)} sekunder taletid`}
             </p>
             <p className="mt-4 max-w-lg text-sm leading-relaxed text-mist">
-              {check
-                ? "AI-sensoren har hørt opptakene og vurderer grammatikk, ordforråd, sammenheng og uttale."
-                : "Hør på opptakene dine og sammenlign med eksempelsvarene."}
+              {!check
+                ? "Hør på opptakene dine og sammenlign med eksempelsvarene."
+                : !levels.every(Boolean)
+                  ? "AI-sensoren vurderer svarene dine …"
+                  : graded.every(Boolean)
+                    ? "AI-sensoren har hørt opptakene og vurdert grammatikk, ordforråd, sammenheng og uttale."
+                    : "AI-sensoren har vurdert det nettleseren oppfattet av svarene. Uttalen ble ikke vurdert denne gangen."}
             </p>
           </div>
         </div>
@@ -507,7 +512,8 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
             </p>
           ) : aiRequired ? (
             <p className="mt-6 text-sm leading-relaxed text-granite">
-              AI-sensoren stiller oppfølgingsspørsmål og vurderer prøven. Dette er den gratis vurderingen din. {PRIVACY}
+              AI-sensoren stiller oppfølgingsspørsmål og vurderer prøven. Dette er den gratis vurderingen din.{" "}
+              {oral.state === "ready" && oral.heard && PRIVACY}
             </p>
           ) : fresh && oral.state === "ready" ? (
             canCheck ? (
@@ -521,8 +527,9 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
                 <span>
                   <span className="block font-medium">La AI-sensoren høre og vurdere svarene</span>
                   <span className="text-sm text-granite">
-                    Som på prøven stiller sensoren oppfølgingsspørsmål. Til slutt får du nivå, tilbakemelding på uttalen og
-                    forslag til hvordan du kan si ting bedre. {allowanceText(oral.allowance)} {PRIVACY}
+                    Som på prøven stiller sensoren oppfølgingsspørsmål. Til slutt får du nivå
+                    {oral.heard ? ", tilbakemelding på uttalen" : ""} og forslag til hvordan du kan si ting bedre.{" "}
+                    {allowanceText(oral.allowance)} {oral.heard && PRIVACY}
                   </span>
                 </span>
               </label>
