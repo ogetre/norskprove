@@ -1,10 +1,10 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
-import { recordTokens, releaseCheck, reserveCheck, userDailyLimit, type AiKind } from "./ai-usage";
+import { monthlyFeedbackUsed, recordTokens, releaseCheck, reserveCheck, userDailyLimit, type AiKind } from "./ai-usage";
 import { authEnabled } from "./auth-config";
 import { Refused } from "./claude";
-import { planHasAiFeedback } from "./plans";
+import { planHasAiFeedback, writingFeedbackLimit, type PlanId, type WritingAllowance } from "./plans";
 import { activePlan } from "./subscription";
 
 // Locally the AI features can be tried without signing in.
@@ -22,25 +22,38 @@ function notBilled(err: unknown): boolean {
   return err instanceof Anthropic.APIError && !(err instanceof Anthropic.APIConnectionTimeoutError);
 }
 
+/** How many texts the learner can have graded this month, and has. */
+export async function writingAllowance(userId: string, plan: PlanId | null): Promise<WritingAllowance> {
+  const limit = writingFeedbackLimit(plan);
+  const used = await monthlyFeedbackUsed(userId);
+  return { limit, used, left: limit === null ? null : Math.max(0, limit - used) };
+}
+
 /**
  * Runs one AI request for a signed-in learner within the daily limits, and turns the
  * outcome into a response. `run` gets a callback that records the tokens Claude billed.
+ * With `monthly`, the request also uses one of the texts the learner can have graded a month.
  */
 export async function withAiLimits(
   kind: AiKind,
   run: (onUsage: (input: number, output: number) => Promise<void>) => Promise<object>,
-  { premium = false }: { premium?: boolean } = {},
+  { premium = false, monthly = false }: { premium?: boolean; monthly?: boolean } = {},
 ): Promise<Response> {
   if (!process.env.ANTHROPIC_API_KEY) return fail("AI er ikke satt opp ennå.", 503);
 
   const userId = authEnabled ? (await auth()).userId : null;
   if (!userId && !isDev) return fail("Logg inn for å bruke dette.", 401);
-  if (premium && userId && !isDev && !planHasAiFeedback(await activePlan(userId))) {
+  const plan = userId && (premium || monthly) ? await activePlan(userId) : null;
+  if (premium && userId && !isDev && !planHasAiFeedback(plan)) {
     return fail("AI-tilbakemelding er med i Premium.", 403);
   }
+  const monthLimit = monthly ? writingFeedbackLimit(plan) : null;
 
   if (userId) {
-    const reserved = await reserveCheck(userId, kind);
+    const reserved = await reserveCheck(userId, kind, monthLimit);
+    if (reserved === "month-limit") {
+      return fail(`Du har brukt de ${monthLimit} AI-vurderingene dine denne måneden. Du får nye neste måned.`, 403);
+    }
     if (reserved === "user-limit") {
       return fail(`Du har nådd grensen på ${userDailyLimit(kind)} for i dag. Prøv igjen i morgen.`, 429);
     }
@@ -53,7 +66,9 @@ export async function withAiLimits(
     });
     return Response.json(body);
   } catch (err) {
-    if (userId && notBilled(err)) await releaseCheck(userId, kind).catch(() => undefined);
+    if (userId && notBilled(err)) {
+      await releaseCheck(userId, kind, { month: monthLimit !== null }).catch(() => undefined);
+    }
     if (err instanceof Refused) return fail("Dette kunne ikke behandles. Prøv noe annet.", 422);
     if (
       err instanceof Anthropic.RateLimitError ||

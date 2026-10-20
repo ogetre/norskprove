@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PublicHeader } from "@/components/PublicHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { authEnabled } from "@/lib/auth-config";
-import { BETA_ORAL_CHECKS, FREE_BETA, PLANS } from "@/lib/plans";
+import { BETA_ORAL_CHECKS, BETA_WRITING_CHECKS, FREE_BETA, PLANS } from "@/lib/plans";
 import { BetaActions } from "./BetaActions";
 import { PlanButton } from "./PlanButton";
 
@@ -29,7 +29,7 @@ const BETA_GROUPS: { title: string; items: string[] }[] = [
     title: "Med gratis konto",
     items: [
       "Fremgangen lagres på alle enhetene dine",
-      "AI-tilbakemelding på tekstene du skriver",
+      `AI-tilbakemelding på tekstene du skriver: ${BETA_WRITING_CHECKS} tekster i måneden`,
       `AI-vurdering av muntlig, også uttalen: ${BETA_ORAL_CHECKS} prøver i måneden`,
       "Oversettelse til morsmålet ditt når du trykker på et ord",
     ],
