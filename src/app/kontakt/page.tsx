@@ -19,7 +19,7 @@ export default function ContactPage() {
     >
       <Section title="Kontakt oss">
         <p>
-          Har du spørsmål om abonnementet, en feil du vil melde eller en idé til tjenesten? Skriv til{" "}
+          Har du et spørsmål, en feil du vil melde eller en idé til tjenesten? Skriv til{" "}
           <CompanyField field="email" />. Vi svarer så raskt vi kan, vanligvis innen noen dager.
         </p>
       </Section>

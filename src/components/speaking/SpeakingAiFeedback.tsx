@@ -8,6 +8,7 @@ import { topicName } from "@/lib/feedback-topics";
 import { textLang } from "@/lib/languages";
 import { useNativeLanguage } from "@/lib/native-language";
 import { gradeTask, type Graded } from "@/lib/oral-check-client";
+import { BETA_ORAL_CHECKS, FREE_BETA } from "@/lib/plans";
 import type { Answer } from "@/lib/speaking-checks";
 import { attachSpeakingFeedback, useAppState } from "@/lib/store";
 import { speak, stopSpeaking, useNorwegianVoices } from "@/lib/tts";
@@ -76,13 +77,17 @@ export function SpeakingAiFeedback({
         <div className="max-w-xl">
           <h2 className="text-lg font-semibold">Få svarene vurdert av AI-sensoren</h2>
           <p className="mt-1 text-sm leading-relaxed">
-            AI-sensoren hører opptakene dine, vurderer grammatikk, ordforråd og uttale og anslår nivået. Den første
-            vurderingen er gratis, og abonnementene har 3, 10 eller ubegrenset i måneden.
+            AI-sensoren hører opptakene dine, vurderer grammatikk, ordforråd og uttale og anslår nivået.{" "}
+            {FREE_BETA
+              ? `Mens tjenesten er i beta, får alle med konto ${BETA_ORAL_CHECKS} gratis vurderinger i måneden. Logg inn og la AI-sensoren høre svarene neste gang du øver.`
+              : "Den første vurderingen er gratis, og abonnementene har 3, 10 eller ubegrenset i måneden."}
           </p>
         </div>
-        <Link href="/priser" className="rounded-md bg-rorbu px-5 py-2.5 font-medium text-white transition-colors hover:bg-[#a03022]">
-          Se abonnementer
-        </Link>
+        {!FREE_BETA && (
+          <Link href="/priser" className="rounded-md bg-rorbu px-5 py-2.5 font-medium text-white transition-colors hover:bg-[#a03022]">
+            Se abonnementer
+          </Link>
+        )}
       </section>
     );
   }

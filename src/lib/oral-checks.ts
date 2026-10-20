@@ -1,13 +1,13 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { ensureSchema, sql } from "./db";
-import { FREE_ORAL_CHECKS, PLAN_ORAL_CHECKS, type OralAllowance, type PlanId } from "./plans";
+import { oralQuota, type OralAllowance, type PlanId } from "./plans";
 
 /*
  * AI checks of the oral test. One check is one oral test, or one practice task, heard and graded
  * by Gemini. It is taken when the learner starts, and the follow-up questions during the test and
  * the grading at the end are made for that check, so a check can't be stretched over more tasks.
- * Every signed-in learner has one free check; a plan gives a number of checks each month.
+ * Every signed-in learner has one free check; a plan, or the free beta, gives a number each month.
  */
 
 /** A check is open for a day, so a test can be continued after a break. */
@@ -25,16 +25,13 @@ const siteDailyBudget = () => envNumber("ORAL_DAILY_BUDGET_USD", 5);
 
 export async function oralAllowance(userId: string, plan: PlanId | null): Promise<OralAllowance> {
   await ensureSchema();
-  const db = sql();
-  if (!plan) {
-    const [row] = await db`SELECT count(*)::int AS n FROM oral_checks WHERE user_id = ${userId} AND free`;
-    return { limit: FREE_ORAL_CHECKS, used: row.n, left: Math.max(0, FREE_ORAL_CHECKS - row.n), free: true };
-  }
-  const limit = PLAN_ORAL_CHECKS[plan];
-  const [row] = await db`
+  const { limit, free } = oralQuota(plan);
+  // Monthly checks are counted from the start of the month, the free one for all time.
+  const [row] = await sql()`
     SELECT count(*)::int AS n FROM oral_checks
-    WHERE user_id = ${userId} AND NOT free AND created_at >= date_trunc('month', now())`;
-  return { limit, used: row.n, left: limit === null ? null : Math.max(0, limit - row.n), free: false };
+    WHERE user_id = ${userId} AND free = ${free}::boolean
+      AND created_at >= CASE WHEN ${free}::boolean THEN '-infinity'::timestamptz ELSE date_trunc('month', now()) END`;
+  return { limit, used: row.n, left: limit === null ? null : Math.max(0, limit - row.n), free };
 }
 
 export type Started = { id: string; resumed: boolean } | "used-up" | "site-limit";
@@ -57,10 +54,9 @@ export async function startOralCheck(userId: string, plan: PlanId | null, taskId
   const [spent] = await db`SELECT COALESCE(SUM(cost_usd), 0) AS usd FROM oral_checks WHERE created_at >= current_date`;
   if (Number(spent.usd) >= siteDailyBudget()) return "site-limit";
 
-  const limit = plan ? PLAN_ORAL_CHECKS[plan] : FREE_ORAL_CHECKS;
+  const { limit, free } = oralQuota(plan);
   const id = randomUUID();
-  const free = plan === null;
-  // A plan's checks are counted per month, the free one for all time.
+  // Monthly checks are counted from the start of the month, the free one for all time.
   const inserted = await db`
     INSERT INTO oral_checks (id, user_id, task_ids, free)
     SELECT ${id}, ${userId}, ${taskIds}::text[], ${free}::boolean

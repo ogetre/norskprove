@@ -2,6 +2,15 @@ import type { Skill } from "./types";
 
 export type PlanId = "start" | "pluss" | "premium";
 
+/**
+ * While NorskprøveKlar is in its free beta, everything is open to everyone, to see how much the
+ * site is used before payment opens. Signing in is only needed for AI feedback, which keeps its
+ * quotas and daily budgets. Set to false when payment opens.
+ */
+export const FREE_BETA = true;
+/** AI checks of the oral test a month for every account during the beta. */
+export const BETA_ORAL_CHECKS = 5;
+
 /** Which parts of the exam each plan unlocks. */
 export const PLAN_SKILLS: Record<PlanId, Skill[]> = {
   start: ["lesing", "lytting", "muntlig"],
@@ -10,12 +19,12 @@ export const PLAN_SKILLS: Record<PlanId, Skill[]> = {
 };
 
 export function planCovers(plan: PlanId | null, skill: Skill): boolean {
-  return plan !== null && PLAN_SKILLS[plan].includes(skill);
+  return FREE_BETA || (plan !== null && PLAN_SKILLS[plan].includes(skill));
 }
 
-/** AI feedback on written texts is part of Premium. */
+/** AI feedback on written texts is part of Premium, and open to every account in the beta. */
 export function planHasAiFeedback(plan: PlanId | null): boolean {
-  return plan === "premium";
+  return FREE_BETA || plan === "premium";
 }
 
 /**
@@ -27,6 +36,16 @@ export const FREE_ORAL_CHECKS = 1;
 
 /** How many oral checks the learner has; `limit` and `left` are null for no limit. */
 export type OralAllowance = { limit: number | null; used: number; left: number | null; free: boolean };
+
+/**
+ * The oral checks an account gets: a plan's or the beta's each month, otherwise the one free
+ * check for all time (`free`). Free checks are counted apart, so they never use up a plan's.
+ */
+export function oralQuota(plan: PlanId | null): { limit: number | null; free: boolean } {
+  if (plan) return { limit: PLAN_ORAL_CHECKS[plan], free: false };
+  if (FREE_BETA) return { limit: BETA_ORAL_CHECKS, free: false };
+  return { limit: FREE_ORAL_CHECKS, free: true };
+}
 
 export interface Plan {
   id: PlanId;

@@ -9,7 +9,7 @@ import { locateErrors, type LocatedError } from "@/lib/error-spans";
 import { FEEDBACK_LEVELS, topicName, type FeedbackLevel } from "@/lib/feedback-topics";
 import { textLang } from "@/lib/languages";
 import { useNativeLanguage } from "@/lib/native-language";
-import { planHasAiFeedback } from "@/lib/plans";
+import { FREE_BETA, planHasAiFeedback } from "@/lib/plans";
 import { attachWritingFeedback, useAppState } from "@/lib/store";
 import type { WritingFeedback } from "@/lib/types";
 import { countWords } from "@/lib/writing-checks";
@@ -59,7 +59,7 @@ function requestFeedback(key: string, taskId: string, text: string, lang: string
 
 type Outcome = { feedback: WritingFeedback } | { error: string; canRetry: boolean };
 
-/** Language feedback from Claude on a handed-in text, for Premium. */
+/** Language feedback from Claude on a handed-in text, for Premium, and for every account in the free beta. */
 export function AiFeedback({
   task,
   text,
@@ -71,13 +71,13 @@ export function AiFeedback({
   submissionId?: string;
   trial?: boolean;
 }) {
-  const { plan, loading, dev } = useAccess();
+  const { plan, signedIn, loading, dev } = useAccess();
   const [lang] = useNativeLanguage();
   const saved = useAppState().writing.find((w) => submissionId && w.id === submissionId)?.feedback;
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [round, setRound] = useState(0);
 
-  const allowed = !trial && (dev || planHasAiFeedback(plan));
+  const allowed = !trial && (dev || (signedIn && planHasAiFeedback(plan)));
   const enough = countWords(text) >= 5;
   const wanted = !loading && allowed && enough && !saved;
   const key = submissionId ?? `${task.id}:${text}`;
@@ -106,7 +106,7 @@ export function AiFeedback({
 
   const feedback = saved ?? (outcome && "feedback" in outcome ? outcome.feedback : undefined);
   if (feedback) return <FeedbackView task={task} text={text} feedback={feedback} submissionId={submissionId} />;
-  if (trial || (!loading && !allowed)) return <Upsell trial={trial} />;
+  if (trial || (!loading && !allowed)) return <Upsell trial={trial} signedIn={signedIn} />;
   if (!enough) {
     return (
       <p className="rounded-lg bg-note px-4 py-3 text-sm leading-relaxed text-note-ink">
@@ -164,7 +164,26 @@ const STAGES: [from: number, label: string][] = [
   [75, "Skriver tilbakemeldingen"],
 ];
 
-function Upsell({ trial }: { trial: boolean }) {
+function Upsell({ trial, signedIn }: { trial: boolean; signedIn: boolean }) {
+  if (FREE_BETA) {
+    return (
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-note p-6 text-note-ink sm:p-7">
+        <div className="max-w-xl">
+          <h2 className="text-lg font-semibold">Få gratis tilbakemelding fra AI-sensoren</h2>
+          <p className="mt-1 text-sm leading-relaxed">
+            AI-sensoren finner feilene i teksten din, forklarer reglene og vurderer hvilket nivå teksten viser.{" "}
+            {signedIn ? "Skriv en tekst under Skriving for å få den." : "Det er gratis mens tjenesten er i beta. Du trenger bare en konto."}
+          </p>
+        </div>
+        <Link
+          href={signedIn ? "/trening/skriving" : "/registrer?redirect_url=/trening/skriving"}
+          className="rounded-md bg-rorbu px-5 py-2.5 font-medium text-white transition-colors hover:bg-[#a03022]"
+        >
+          {signedIn ? "Gå til skriving" : "Lag gratis konto"}
+        </Link>
+      </section>
+    );
+  }
   return (
     <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-note p-6 text-note-ink sm:p-7">
       <div className="max-w-xl">

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { Analytics } from "@vercel/analytics/next";
 import { Golos_Text, Unbounded } from "next/font/google";
 import { ProgressSync } from "@/components/ProgressSync";
 import { themeScript } from "@/lib/theme-script";
@@ -47,6 +48,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         ) : (
           children
         )}
+        {/* Page views without cookies, to see how much the free beta is used. */}
+        <Analytics />
       </body>
     </html>
   );

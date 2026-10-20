@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CompanyDetails, CompanyField, LegalPage, List, Section, To } from "@/components/LegalPage";
-import { FREE_ORAL_CHECKS, PLAN_ORAL_CHECKS, PLANS } from "@/lib/plans";
+import { FREE_BETA, FREE_ORAL_CHECKS, PLAN_ORAL_CHECKS, PLANS } from "@/lib/plans";
 
 export const metadata: Metadata = {
   title: "Salgsvilkår",
@@ -20,6 +20,17 @@ export default function TermsPage() {
         </p>
       }
     >
+      {FREE_BETA && (
+        <div className="rounded-xl bg-note p-5 text-note-ink">
+          <p className="font-semibold">NorskprøveKlar er gratis mens vi tester</p>
+          <p className="mt-2">
+            Akkurat nå selger vi ingenting, og du kan bruke hele tjenesten uten å betale. Vilkårene om kjøp, betaling og
+            angrerett gjelder først når abonnementene åpner. Vi gir beskjed på nettstedet før det skjer. Reglene under
+            «Nivåvurderinger og AI» og «Bruk av tjenesten» gjelder også nå.
+          </p>
+        </div>
+      )}
+
       <Section title="Partene">
         <p>Selger er:</p>
         <CompanyDetails />
