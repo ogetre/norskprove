@@ -5,6 +5,7 @@ import { LevelRidge } from "@/components/LevelRidge";
 import { ProgressPreview } from "@/components/ProgressPreview";
 import { AuthActions } from "@/components/PublicHeader";
 import { Reveal } from "@/components/Reveal";
+import { LEGAL_LINKS } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { TaskDemo } from "@/components/TaskDemo";
@@ -358,9 +359,15 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <div className="mt-16 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-mist sm:flex-row sm:justify-between">
-            <span>© 2026 NorskprøveKlar</span>
-            <span>Uavhengig tjeneste, ikke tilknyttet HK-dir.</span>
+          <div className="mt-16 flex flex-col gap-3 border-t border-white/10 pt-6 text-sm text-mist sm:flex-row sm:items-center sm:justify-between">
+            <span>© 2026 NorskprøveKlar · Uavhengig tjeneste, ikke tilknyttet HK-dir.</span>
+            <nav aria-label="Om tjenesten" className="flex gap-5">
+              {LEGAL_LINKS.map((l) => (
+                <Link key={l.href} href={l.href} className="underline-offset-4 hover:text-snow hover:underline">
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
           </div>
         </Reveal>
       </footer>

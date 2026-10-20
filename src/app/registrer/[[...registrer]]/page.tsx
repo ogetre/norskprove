@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Suspense } from "react";
 import { SignUp } from "@clerk/nextjs";
 import { AuthShell, AuthUnavailable } from "@/components/AuthShell";
@@ -14,9 +15,22 @@ export default function SignUpPage() {
     >
       {authEnabled ? (
         // Clerk reads the URL, so it renders after the static shell.
-        <Suspense fallback={<div className="h-[480px] animate-pulse rounded-xl bg-white/70" />}>
-          <SignUp />
-        </Suspense>
+        <>
+          <Suspense fallback={<div className="h-[480px] animate-pulse rounded-xl bg-white/70" />}>
+            <SignUp />
+          </Suspense>
+          <p className="mt-4 text-center text-sm leading-relaxed text-granite">
+            Når du oppretter konto, godtar du{" "}
+            <Link href="/vilkar" className="underline underline-offset-4 hover:text-ink">
+              salgsvilkårene
+            </Link>{" "}
+            og{" "}
+            <Link href="/personvern" className="underline underline-offset-4 hover:text-ink">
+              personvernerklæringen
+            </Link>
+            .
+          </p>
+        </>
       ) : (
         <AuthUnavailable />
       )}
