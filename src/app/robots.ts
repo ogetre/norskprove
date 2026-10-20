@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
       // The API, sign-in and the learner's own pages have nothing for search engines.
-      disallow: ["/api/", "/logg-inn", "/registrer", "/oversikt", "/trening/feil", "/trening/ord"],
+      disallow: ["/api/", "/admin", "/logg-inn", "/registrer", "/oversikt", "/trening/feil", "/trening/ord"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };
