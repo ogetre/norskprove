@@ -6,6 +6,8 @@ import { ProgressSync } from "@/components/ProgressSync";
 import { themeScript } from "@/lib/theme-script";
 import { authEnabled } from "@/lib/auth-config";
 import { clerkAppearance, clerkLocalization } from "@/lib/clerk-theme";
+import { FREE_BETA } from "@/lib/plans";
+import { SITE_NAME, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
 const golos = Golos_Text({
@@ -19,12 +21,15 @@ const unbounded = Unbounded({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "NorskprøveKlar – forbered deg til Norskprøven",
-    template: "%s – NorskprøveKlar",
+    default: `${SITE_NAME} – forbered deg til Norskprøven`,
+    template: `%s – ${SITE_NAME}`,
   },
-  description:
-    "Øv til Norskprøven: lesing, lytting, skriving og muntlig. Oppgaver i samme format som på prøven, med forklaringer.",
+  description: `Øv til Norskprøven: lesing, lytting, skriving og muntlig. Oppgaver i samme format som på prøven, med forklaringer.${FREE_BETA ? " Gratis mens vi tester." : ""}`,
+  // The preview image is opengraph-image.png next to this file.
+  openGraph: { siteName: SITE_NAME, locale: "nb_NO", type: "website" },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
