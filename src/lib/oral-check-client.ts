@@ -113,7 +113,7 @@ async function inTurn<T>(work: () => Promise<T>): Promise<T> {
 }
 
 /** The AI grading of one task from its recordings. Throws with a message for the learner. */
-export function gradeTask(checkId: string, taskId: string, answers: Answer[], lang: string): Promise<Graded> {
+export function gradeTask(checkId: string, taskId: string, answers: Answer[]): Promise<Graded> {
   const key = `${checkId}:${taskId}`;
   let request = gradings.get(key);
   if (!request) {
@@ -121,7 +121,6 @@ export function gradeTask(checkId: string, taskId: string, answers: Answer[], la
       const form = new FormData();
       form.set("checkId", checkId);
       form.set("taskId", taskId);
-      form.set("lang", lang);
       form.set("turns", JSON.stringify(answers.map((a) => ({ question: a.question, followUp: Boolean(a.followUp), text: a.transcript }))));
       const audio = await Promise.all(answers.map(recordingOf));
       audio.forEach((blob, i) => blob && form.set(`audio_${i}`, blob));

@@ -1,6 +1,5 @@
 import { getWritingTask } from "@/content/writing";
 import { fail, withAiLimits } from "@/lib/ai-route";
-import { isLanguage } from "@/lib/languages";
 import { recheckWriting } from "@/lib/writing-ai";
 import { countWords } from "@/lib/writing-checks";
 
@@ -22,7 +21,7 @@ function isError(e: unknown): e is ErrorIn {
 
 /** Checks the learner's own corrections of the errors their feedback marked. */
 export async function POST(req: Request) {
-  let body: { taskId?: unknown; original?: unknown; revised?: unknown; errors?: unknown; lang?: unknown };
+  let body: { taskId?: unknown; original?: unknown; revised?: unknown; errors?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -38,11 +37,10 @@ export async function POST(req: Request) {
     return fail("Ugyldig liste over feil.", 400);
   }
   const errors = body.errors;
-  const lang = isLanguage(body.lang) ? body.lang : null;
 
   return withAiLimits(
     "recheck",
-    async (onUsage) => ({ check: await recheckWriting(task, { original, revised, errors }, lang, onUsage) }),
+    async (onUsage) => ({ check: await recheckWriting(task, { original, revised, errors }, onUsage) }),
     { premium: true },
   );
 }

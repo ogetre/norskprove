@@ -3,7 +3,6 @@ import { z } from "zod";
 import { SPEAKING_KIND_NAMES, type SpeakingTask } from "@/content/speaking";
 import { askJson } from "./claude";
 import { ERROR_TOPIC_IDS, FEEDBACK_LEVELS, HEARD_SPEAKING_CRITERIA, SPEAKING_CRITERIA } from "./feedback-topics";
-import { languageInfo, type LanguageCode } from "./languages";
 import type { SpeakingFeedback } from "./types";
 import { GRAMMAR_RULES } from "./writing-ai";
 
@@ -96,19 +95,11 @@ export const HeardSpeakingSchema = SpeakingSchema.extend({
 
 const NORWEGIAN = `Everything you write for the candidate must be in Norwegian bokmål the candidate can understand at the task's level: short sentences and everyday words for A1–A2, more precise terms for B1–B2.`;
 
-const native = (language: string) =>
-  `Write the explanations, the criterion comments, the summary and the strengths in ${language}, in short, simple sentences a beginner understands. Quote Norwegian words in «». The "original" and "better" fields and the model answer are always Norwegian bokmål.`;
-
-/** The language of the explanations: the learner's own at A1–A2 when they chose one. */
-export function feedbackLanguage(task: SpeakingTask, lang: LanguageCode | null): LanguageCode | null {
-  return task.level === "A1" || task.level === "A2" ? lang : null;
-}
-
 /**
  * The examiner's instructions for assessing one task. `heard` is true for Gemini, which gets the
  * recordings, writes down what was said and also assesses pronunciation; Claude only gets text.
  */
-export function assessmentPrompt(task: SpeakingTask, nativeLang: LanguageCode | null, heard: boolean): string {
+export function assessmentPrompt(task: SpeakingTask, heard: boolean): string {
   const source = heard
     ? `You hear the candidate's recordings, one for each of the examiner's questions. Spoken Norwegian varies: accept every dialect and form bokmål allows.
 
@@ -135,7 +126,7 @@ Norskprøven assesses pronunciation by how easy the candidate is to understand, 
 
   return `You are an experienced examiner for the oral part of Norskprøven, the Norwegian test for adult immigrants, and a friendly teacher. You assess a candidate's spoken answers to one task and give feedback that helps them learn.
 
-${nativeLang ? native(languageInfo(nativeLang).english) : NORWEGIAN}
+${NORWEGIAN}
 
 ${source}
 
@@ -159,28 +150,26 @@ Assess each criterion once, in this order: ${criteria}. Give the CEFR level the 
 - "model_answer": the candidate's answer to the first question, corrected and improved to a good spoken answer at the task's level. Keep their content and ideas; about as long as a good answer in ${task.speakSeconds} seconds.`;
 }
 
-/** Drops corrections that change nothing, and notes the language of the explanations. */
-export function finishFeedback<T extends { improvements: z.infer<typeof Improvement>[] }>(parsed: T, nativeLang: LanguageCode | null) {
+/** Drops corrections that change nothing. */
+export function finishFeedback<T extends { improvements: z.infer<typeof Improvement>[] }>(parsed: T) {
   const improvements = parsed.improvements.filter((e) => e.original.trim() && e.original !== e.better);
-  return { ...parsed, improvements, ...(nativeLang ? { lang: nativeLang } : {}) };
+  return { ...parsed, improvements };
 }
 
 /** Assessment of a candidate's spoken answers to one task, from the transcripts. */
 export async function assessSpeaking(
   task: SpeakingTask,
   turns: Turn[],
-  lang: LanguageCode | null,
   onUsage: OnUsage,
 ): Promise<SpeakingFeedback> {
-  const nativeLang = feedbackLanguage(task, lang);
   const parsed = await askJson(SpeakingSchema, {
-    system: assessmentPrompt(task, nativeLang, false),
+    system: assessmentPrompt(task, false),
     prompt: conversation(task, turns),
     effort: "medium",
     maxTokens: 8000,
     onUsage,
   });
-  return finishFeedback(parsed, nativeLang);
+  return finishFeedback(parsed);
 }
 
 /** Turns from a request: 1–12 of them, each a question and an answer of sensible length. */

@@ -1,4 +1,4 @@
-/** Languages a learner can get translations and explanations in. */
+/** Languages a learner can get word lookups and translations in. Feedback is always Norwegian. */
 export const LANGUAGES = [
   { code: "en", name: "English", english: "English" },
   { code: "uk", name: "Українська", english: "Ukrainian" },

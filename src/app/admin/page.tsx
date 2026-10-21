@@ -34,6 +34,7 @@ const AI_KINDS: Record<string, string> = {
   translate: "Oversettelse av avsnitt",
   speaking: "Muntlig vurdering (Claude)",
   followup: "Oppfølgingsspørsmål (Claude)",
+  speech: "Opplesning (Google, gratis)",
 };
 
 const LEVEL_ORDER = ["under A1", "A1", "A2", "B1", "B2"];

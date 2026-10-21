@@ -2,7 +2,6 @@ import { auth } from "@clerk/nextjs/server";
 import { getWritingTask } from "@/content/writing";
 import { fail, withAiLimits, writingAllowance } from "@/lib/ai-route";
 import { authEnabled } from "@/lib/auth-config";
-import { isLanguage } from "@/lib/languages";
 import { activePlan } from "@/lib/subscription";
 import { assessWriting } from "@/lib/writing-ai";
 import { countWords } from "@/lib/writing-checks";
@@ -14,7 +13,7 @@ const MAX_CHARS = 4000;
 
 /** AI feedback on a written answer: errors with corrections, criteria and an estimated level. */
 export async function POST(req: Request) {
-  let body: { taskId?: unknown; text?: unknown; lang?: unknown };
+  let body: { taskId?: unknown; text?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -28,9 +27,8 @@ export async function POST(req: Request) {
   if (text.length > MAX_CHARS || words > task.maxWords * 2) {
     return fail(`Teksten er for lang til å vurderes. Hold deg under ${task.maxWords * 2} ord.`, 413);
   }
-  const lang = isLanguage(body.lang) ? body.lang : null;
 
-  return withAiLimits("feedback", async (onUsage) => ({ feedback: await assessWriting(task, text, lang, onUsage) }), {
+  return withAiLimits("feedback", async (onUsage) => ({ feedback: await assessWriting(task, text, onUsage) }), {
     premium: true,
     monthly: true,
   });

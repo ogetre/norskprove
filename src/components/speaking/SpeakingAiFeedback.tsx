@@ -6,12 +6,12 @@ import { AiPending } from "@/components/AiPending";
 import type { SpeakingTask } from "@/content/speaking";
 import { topicName } from "@/lib/feedback-topics";
 import { textLang } from "@/lib/languages";
-import { useNativeLanguage } from "@/lib/native-language";
 import { gradeTask, type Graded } from "@/lib/oral-check-client";
 import { BETA_ORAL_CHECKS, FREE_BETA } from "@/lib/plans";
 import type { Answer } from "@/lib/speaking-checks";
 import { attachSpeakingFeedback, useAppState } from "@/lib/store";
-import { speak, stopSpeaking, useNorwegianVoices } from "@/lib/tts";
+import { useNorwegianVoices } from "@/lib/tts";
+import { say, stopVoice, unlockVoice } from "@/lib/voice";
 import type { SpeakingFeedback } from "@/lib/types";
 
 const STAGES: [from: number, label: string][] = [
@@ -41,7 +41,6 @@ export function SpeakingAiFeedback({
   submissionId?: string;
   onGraded?: (graded: Graded) => void;
 }) {
-  const [lang] = useNativeLanguage();
   const saved = useAppState().speaking.find((s) => submissionId && s.id === submissionId)?.feedback;
   const [result, setResult] = useState<SpeakingFeedback | { error: string } | null>(null);
   const [round, setRound] = useState(0);
@@ -52,7 +51,7 @@ export function SpeakingAiFeedback({
   useEffect(() => {
     if (!wanted || !checkId) return;
     let cancelled = false;
-    gradeTask(checkId, task.id, answers, lang).then(
+    gradeTask(checkId, task.id, answers).then(
       (graded) => {
         if (submissionId) attachSpeakingFeedback(submissionId, graded.feedback);
         onGraded?.(graded);
@@ -67,7 +66,7 @@ export function SpeakingAiFeedback({
     };
     // The answers are fixed once handed in; the check and the task identify them.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wanted, checkId, task.id, submissionId, round, lang]);
+  }, [wanted, checkId, task.id, submissionId, round]);
 
   const feedback = saved ?? (result && !("error" in result) ? result : undefined);
   if (feedback) return <FeedbackView task={task} feedback={feedback} />;
@@ -138,7 +137,10 @@ function Pronunciation({ feedback, rate }: { feedback: SpeakingFeedback; rate: n
             <li key={w.word} className="flex items-start gap-3 rounded-xl p-4 ring-1 ring-ice">
               <button
                 type="button"
-                onClick={() => void speak(w.word, { voice: voices[0], rate: rate * 0.85 })}
+                onClick={() => {
+                  unlockVoice();
+                  void say(w.word, { voice: voices[0], rate: rate * 0.85 });
+                }}
                 aria-label={`Hør «${w.word}»`}
                 className="grid size-8 shrink-0 place-items-center rounded-full bg-tint text-fjord transition-colors hover:bg-ice"
               >
@@ -172,7 +174,7 @@ function FeedbackView({ task, feedback }: { task: SpeakingTask; feedback: Speaki
   const own = textLang(feedback.lang);
   const voices = useNorwegianVoices();
   const [playing, setPlaying] = useState(false);
-  useEffect(() => () => stopSpeaking(), []);
+  useEffect(() => () => stopVoice(), []);
 
   return (
     <section className="rounded-2xl bg-surface p-6 ring-1 ring-ice sm:p-7" aria-label={`Vurdering av ${task.title}`}>
@@ -259,12 +261,13 @@ function FeedbackView({ task, feedback }: { task: SpeakingTask; feedback: Speaki
               type="button"
               onClick={async () => {
                 if (playing) {
-                  stopSpeaking();
+                  stopVoice();
                   setPlaying(false);
                   return;
                 }
+                unlockVoice();
                 setPlaying(true);
-                await speak(feedback.model_answer, { voice: voices[0], rate: RATE[task.level] });
+                await say(feedback.model_answer, { speaker: "kandidat", voice: voices[0], rate: RATE[task.level] });
                 setPlaying(false);
               }}
               className="rounded-md bg-white/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white/25"
