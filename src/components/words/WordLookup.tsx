@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { isRtl, LANGUAGES, type LanguageCode } from "@/lib/languages";
 import { useNativeLanguage } from "@/lib/native-language";
 import { saveWord, useAppState } from "@/lib/store";
-import { speak } from "@/lib/tts";
+import { say, unlockVoice } from "@/lib/voice";
 import type { WordEntry } from "@/lib/types";
 
 type Target = { taskId: string; block: number; word: string; rect: DOMRect; button: HTMLElement };
@@ -178,7 +178,10 @@ function WordCard({ target, onClose }: { target: Target; onClose: (refocus: bool
             <span className="font-display text-2xl font-medium tracking-tight">{target.word}</span>
             <button
               type="button"
-              onClick={() => void speak(target.word, { rate: 0.85 })}
+              onClick={() => {
+                unlockVoice();
+                void say(target.word, { rate: 0.85 });
+              }}
               aria-label={`Hør «${target.word}»`}
               className="grid size-8 place-items-center rounded-full text-fjord ring-1 ring-ice transition-colors hover:bg-ice"
             >

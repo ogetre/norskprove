@@ -5,7 +5,6 @@ import type { WritingTask } from "@/content/writing";
 import type { LocatedError } from "@/lib/error-spans";
 import { topicName } from "@/lib/feedback-topics";
 import { textLang } from "@/lib/languages";
-import { useNativeLanguage } from "@/lib/native-language";
 import { saveRevision, useAppState } from "@/lib/store";
 import type { WritingRecheck } from "@/lib/types";
 
@@ -29,7 +28,6 @@ export function FixYourself({
   onClose: () => void;
 }) {
   const saved = useAppState().writing.find((w) => w.id === submissionId)?.revision;
-  const [lang] = useNativeLanguage();
   const [draft, setDraft] = useState(saved?.text ?? text);
   const [check, setCheck] = useState<WritingRecheck | null>(saved?.check ?? null);
   const [shownFix, setShownFix] = useState<Set<number>>(() => new Set());
@@ -49,7 +47,6 @@ export function FixYourself({
           original: text,
           revised: draft,
           errors: errors.map(({ original, correction, explanation }) => ({ original, correction, explanation })),
-          lang,
         }),
       });
       const data = (await res.json().catch(() => null)) as { check?: WritingRecheck; error?: string } | null;

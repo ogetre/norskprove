@@ -3,6 +3,7 @@
 import audio from "@/content/listening/audio.json";
 import { audioKey, castVoices, effectFor, LEVEL_RATE, speakerOrder, type Cast, type Effect } from "./casting";
 import { narrationUrl } from "./narration";
+import { silence } from "./voice";
 import type { ListeningTask, SpeakerId } from "./types";
 
 /*
@@ -215,27 +216,6 @@ export function questionsRecorded(task: ListeningTask): boolean {
 }
 
 /* ---------- The exam's sound, which plays tasks without the learner pressing play ---------- */
-
-/** A tenth of a second of silence, to unlock the audio element inside a click. */
-function silence(): string {
-  const samples = 2400;
-  const bytes = new Uint8Array(44 + samples * 2);
-  const view = new DataView(bytes.buffer);
-  const text = (at: number, s: string) => [...s].forEach((c, i) => view.setUint8(at + i, c.charCodeAt(0)));
-  text(0, "RIFF");
-  view.setUint32(4, 36 + samples * 2, true);
-  text(8, "WAVEfmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
-  view.setUint32(24, 24000, true);
-  view.setUint32(28, 48000, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  text(36, "data");
-  view.setUint32(40, samples * 2, true);
-  return `data:audio/wav;base64,${btoa(String.fromCharCode(...bytes))}`;
-}
 
 /**
  * Plays tasks and spoken instructions one after another, the way the exam does. Browsers only

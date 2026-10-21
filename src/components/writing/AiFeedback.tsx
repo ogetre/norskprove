@@ -8,7 +8,6 @@ import type { WritingTask } from "@/content/writing";
 import { locateErrors, type LocatedError } from "@/lib/error-spans";
 import { FEEDBACK_LEVELS, topicName, type FeedbackLevel } from "@/lib/feedback-topics";
 import { textLang } from "@/lib/languages";
-import { useNativeLanguage } from "@/lib/native-language";
 import {
   BETA_WRITING_CHECKS,
   FREE_BETA,
@@ -35,7 +34,7 @@ const requests = new Map<string, Promise<WritingFeedback>>();
 // When each request started, so the progress bar keeps its place when the view remounts.
 const startedAt = new Map<string, number>();
 
-function requestFeedback(key: string, taskId: string, text: string, lang: string): Promise<WritingFeedback> {
+function requestFeedback(key: string, taskId: string, text: string): Promise<WritingFeedback> {
   let request = requests.get(key);
   if (!request) {
     startedAt.set(key, Date.now());
@@ -45,7 +44,7 @@ function requestFeedback(key: string, taskId: string, text: string, lang: string
         res = await fetch("/api/writing-feedback", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ taskId, text, lang }),
+          body: JSON.stringify({ taskId, text }),
         });
       } catch {
         throw new RequestError("Fikk ikke kontakt med serveren. Sjekk nettet og prøv igjen.", true);
@@ -78,7 +77,6 @@ export function AiFeedback({
   trial?: boolean;
 }) {
   const { plan, signedIn, loading, dev } = useAccess();
-  const [lang] = useNativeLanguage();
   const saved = useAppState().writing.find((w) => submissionId && w.id === submissionId)?.feedback;
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [round, setRound] = useState(0);
@@ -96,7 +94,7 @@ export function AiFeedback({
   useEffect(() => {
     if (!wanted) return;
     let cancelled = false;
-    requestFeedback(key, task.id, text, lang).then(
+    requestFeedback(key, task.id, text).then(
       (feedback) => {
         if (submissionId) attachWritingFeedback(submissionId, feedback);
         if (!cancelled) setOutcome({ feedback });
@@ -113,7 +111,7 @@ export function AiFeedback({
     return () => {
       cancelled = true;
     };
-  }, [wanted, key, task.id, text, submissionId, round, lang]);
+  }, [wanted, key, task.id, text, submissionId, round]);
 
   const feedback = saved ?? (outcome && "feedback" in outcome ? outcome.feedback : undefined);
   if (feedback) return <FeedbackView task={task} text={text} feedback={feedback} submissionId={submissionId} />;

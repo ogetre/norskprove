@@ -8,10 +8,11 @@ import { ensureSchema, sql } from "./db";
  * taken atomically before calling Claude, so parallel requests cannot go past a limit.
  *
  * ai_usage rows: the user id (writing feedback) or "<user id>:<kind>", and "_total"
- * (writing feedback) or "_total:<kind>" for the whole site.
+ * (writing feedback) or "_total:<kind>" for the whole site. Speech is Google's voice, not Claude:
+ * its rows count characters in input_tokens and stay out of the dollar budget.
  */
 
-export type AiKind = "feedback" | "recheck" | "speaking" | "followup" | "lookup" | "translate";
+export type AiKind = "feedback" | "recheck" | "speaking" | "followup" | "lookup" | "translate" | "speech";
 
 const TOTAL = "_total";
 
@@ -29,6 +30,8 @@ const LIMITS: Record<AiKind, { user: number; site: () => number }> = {
   // Answers are cached for everyone, so most taps cost nothing.
   lookup: { user: 300, site: () => 5000 },
   translate: { user: 100, site: () => 2000 },
+  // Google's voice for what isn't recorded; mostly single words. Characters have their own cap.
+  speech: { user: 200, site: () => 3000 },
 };
 
 export const USER_DAILY_LIMIT = LIMITS.feedback.user;
@@ -39,6 +42,9 @@ export function userDailyLimit(kind: AiKind): number {
 
 /** USD per day for the whole site, from the tokens used so far. */
 const siteDailyBudget = () => envNumber("AI_DAILY_BUDGET_USD", 1);
+
+/** Characters of Google speech a day for the whole site: about the free million a month. */
+const speechDailyChars = () => envNumber("SPEECH_DAILY_CHARS", 30_000);
 
 const userRow = (userId: string, kind: AiKind) => (kind === "feedback" ? userId : `${userId}:${kind}`);
 const siteRow = (kind: AiKind) => (kind === "feedback" ? TOTAL : `${TOTAL}:${kind}`);
@@ -70,7 +76,7 @@ export async function reserveCheck(
   const [spent] = await db`
     SELECT COALESCE(SUM(input_tokens * ${PRICE_PER_TOKEN.input}::numeric
       + output_tokens * ${PRICE_PER_TOKEN.output}::numeric), 0) AS usd
-    FROM ai_usage WHERE day = current_date AND starts_with(user_id, ${TOTAL})`;
+    FROM ai_usage WHERE day = current_date AND starts_with(user_id, ${TOTAL}) AND user_id <> ${siteRow("speech")}`;
   if (Number(spent.usd) >= siteDailyBudget()) return "site-limit";
 
   const month = monthly !== null;
@@ -128,4 +134,16 @@ export async function releaseCheck(
     UPDATE ai_usage SET requests = GREATEST(requests - 1, 0)
     WHERE (day = current_date AND user_id = ANY(${today}::text[]))
       OR (${month}::boolean AND user_id = ${monthRow(userId)} AND day = date_trunc('month', current_date)::date)`;
+}
+
+/** Takes one text for Google's voice from the daily limits, and counts its characters. */
+export async function reserveSpeech(userId: string, chars: number): Promise<Reservation> {
+  await ensureSchema();
+  const [row] = await sql()`
+    SELECT COALESCE(sum(input_tokens), 0)::float8 AS chars FROM ai_usage
+    WHERE user_id = ${siteRow("speech")} AND day = current_date`;
+  if (Number(row?.chars ?? 0) + chars > speechDailyChars()) return "site-limit";
+  const reserved = await reserveCheck(userId, "speech");
+  if (reserved === "ok") await recordTokens(userId, chars, 0, "speech");
+  return reserved;
 }

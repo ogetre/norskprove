@@ -10,7 +10,8 @@ import { FREE_BETA } from "@/lib/plans";
 import { useRecorder } from "@/lib/recorder";
 import { checkAnswer, scriptedCount as scripted, type Answer } from "@/lib/speaking-checks";
 import { addSpeaking, recordAttempt, useHydrated } from "@/lib/store";
-import { speak, stopSpeaking, useNorwegianVoices } from "@/lib/tts";
+import { useNorwegianVoices } from "@/lib/tts";
+import { say, stopVoice, unlockVoice } from "@/lib/voice";
 import type { Level, Mode, SpeakingTurn } from "@/lib/types";
 import { countWords, type Check } from "@/lib/writing-checks";
 import { clock } from "../writing/WritingPractice";
@@ -165,12 +166,13 @@ function TaskResult({
               type="button"
               onClick={async () => {
                 if (playing) {
-                  stopSpeaking();
+                  stopVoice();
                   setPlaying(false);
                   return;
                 }
+                unlockVoice();
                 setPlaying(true);
-                await speak(task.model, { voice: voices[0], rate: RATE[task.level] });
+                await say(task.model, { speaker: "kandidat", voice: voices[0], rate: RATE[task.level] });
                 setPlaying(false);
               }}
               className="rounded-md bg-white/15 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white/25"
@@ -265,7 +267,7 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
     alive.current = true;
     return () => {
       alive.current = false;
-      stopSpeaking();
+      stopVoice();
       clearTimeout(autoStop.current);
     };
   }, []);
@@ -307,7 +309,7 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
     setFollow(followUp);
     setPhase("ask");
     setTyped("");
-    await speak(followUp ?? tasks[t].questions[q], { voice: voices[0], rate: RATE[tasks[t].level] });
+    await say(followUp ?? tasks[t].questions[q], { voice: voices[0], rate: RATE[tasks[t].level] });
     if (!alive.current) return;
     const ok = typedMode ? false : await rec.start();
     if (!ok) setTypedMode(true);
@@ -380,6 +382,8 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
   /** Starts the first question, and the AI check first when the learner wants one. */
   const begin = async () => {
     if (busy.current) return;
+    // Inside the click, so the examiner's questions can be played later.
+    unlockVoice();
     if ((aiWanted || aiRequired) && !check) {
       busy.current = true;
       setStarting(true);

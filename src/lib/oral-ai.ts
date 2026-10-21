@@ -2,11 +2,9 @@ import "server-only";
 import { z } from "zod";
 import type { SpeakingTask } from "@/content/speaking";
 import { ERROR_TOPIC_IDS, FEEDBACK_LEVELS, HEARD_SPEAKING_CRITERIA } from "./feedback-topics";
-import type { LanguageCode } from "./languages";
 import {
   assessmentPrompt,
   conversation,
-  feedbackLanguage,
   finishFeedback,
   FOLLOW_UP_ROLE,
   FOLLOW_UP_RULES,
@@ -98,17 +96,15 @@ export type GradeItem = { question: string; followUp: boolean; text: string; rec
 export async function gradeTask(
   task: SpeakingTask,
   items: GradeItem[],
-  lang: LanguageCode | null,
   onCost: OnCost,
 ): Promise<SpeakingFeedback & { transcripts: string[] }> {
-  const nativeLang = feedbackLanguage(task, lang);
   const parts: Part[] = [{ text: taskContext(task) }];
   items.forEach((item, i) => {
     parts.push({ text: `Sensor${item.followUp ? " (oppfølging)" : ""}: ${item.question}\nOpptak ${i + 1}, kandidatens svar:` });
     parts.push(item.recording ? audio(item.recording) : { text: `(Opptaket mangler. Teksten fra nettleseren: <svar>${item.text}</svar>)` });
   });
   const ask = (model: string, thinking: number, retries: number) =>
-    geminiJson(model, { system: assessmentPrompt(task, nativeLang, true), parts, schema: GRADE_SCHEMA, thinking, timeoutMs: 100_000, retries, onCost });
+    geminiJson(model, { system: assessmentPrompt(task, true), parts, schema: GRADE_SCHEMA, thinking, timeoutMs: 100_000, retries, onCost });
   // Pro grades best but has a small quota per minute; when it stays busy, Flash grades instead.
   const json = await ask(GRADE_MODEL, 4096, 2).catch((err: unknown) => {
     if (err instanceof VertexError && err.status === 429) return ask(FAST_MODEL, 2048, 1);
@@ -117,5 +113,5 @@ export async function gradeTask(
   const parsed = HeardSpeakingSchema.safeParse(json);
   if (!parsed.success) throw new VertexError("Gemini's grading had the wrong shape.", 502);
   const transcripts = items.map((item, i) => parsed.data.transcripts[i]?.trim() || (item.recording ? "" : item.text));
-  return { ...finishFeedback({ ...parsed.data, transcripts }, nativeLang), heard: true };
+  return { ...finishFeedback({ ...parsed.data, transcripts }), heard: true };
 }

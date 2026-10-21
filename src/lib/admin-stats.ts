@@ -193,7 +193,7 @@ async function ai(days: string[]): Promise<Stats["ai"]> {
     // The site's totals per kind: "_total" is writing feedback, "_total:<kind>" the others.
     db`
       SELECT day::text AS day, sum(input_tokens)::float8 AS input, sum(output_tokens)::float8 AS output
-      FROM ai_usage WHERE starts_with(user_id, '_total') AND day >= ${days[0]}::date GROUP BY day`,
+      FROM ai_usage WHERE starts_with(user_id, '_total') AND user_id <> '_total:speech' AND day >= ${days[0]}::date GROUP BY day`,
     db`
       SELECT user_id, sum(requests)::int AS requests, sum(input_tokens)::float8 AS input, sum(output_tokens)::float8 AS output
       FROM ai_usage WHERE starts_with(user_id, '_total') AND day >= date_trunc('month', current_date)::date
@@ -221,7 +221,8 @@ async function ai(days: string[]): Promise<Stats["ai"]> {
     .map((r) => ({
       kind: (r.user_id as string) === "_total" ? "feedback" : (r.user_id as string).slice("_total:".length),
       requests: r.requests as number,
-      usd: usd(r.input as number, r.output as number),
+      // Google's voice counts characters, free up to a million a month.
+      usd: r.user_id === "_total:speech" ? 0 : usd(r.input as number, r.output as number),
     }))
     .sort((a, b) => b.requests - a.requests);
   return {

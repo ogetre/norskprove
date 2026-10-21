@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { isLanguage, isRtl } from "@/lib/languages";
 import { GRADES, inDays, reviewQueue, schedule, type Grade } from "@/lib/srs";
 import { dayKey, removeWord, reviewCard, useAppState, useHydrated } from "@/lib/store";
-import { speak } from "@/lib/tts";
+import { say, unlockVoice } from "@/lib/voice";
 import type { SavedWord } from "@/lib/types";
 
 function daysBetween(from: string, to: string): number {
@@ -79,7 +79,10 @@ function Review({ onDone }: { onDone: () => void }) {
           {word.lemma}
           <button
             type="button"
-            onClick={() => void speak(word.lemma.replace(/^(å|en|ei|et) /, ""), { rate: 0.85 })}
+            onClick={() => {
+              unlockVoice();
+              void say(word.lemma.replace(/^(å|en|ei|et) /, ""), { rate: 0.85 });
+            }}
             aria-label={`Hør «${word.lemma}»`}
             className="grid size-9 place-items-center rounded-full text-fjord ring-1 ring-ice hover:bg-ice"
           >

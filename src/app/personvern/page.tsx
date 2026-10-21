@@ -34,7 +34,7 @@ export default function PrivacyPage() {
             <strong>Fremgang og det du lager.</strong> Svarene dine på oppgaver, resultater, tekstene du skriver, det du
             sier i muntlige oppgaver (som tekst), ordene du lagrer, og målet ditt for prøven: nivå, prøvedato og hvorfor
             du tar prøven, for eksempel statsborgerskap, hvis du oppgir det. I tillegg lagrer vi morsmålet du velger for
-            forklaringer. Dette lagres i nettleseren din, og når du er logget inn, også i databasen vår, slik at du har
+            oversettelser. Dette lagres i nettleseren din, og når du er logget inn, også i databasen vår, slik at du har
             det på alle enhetene dine. Grunnlaget er avtalen med deg.
           </li>
           <li>

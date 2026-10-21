@@ -198,7 +198,7 @@ export interface WritingFeedback {
   strengths: string[];
   improved_text: string;
   tips: string[];
-  /** Language of the explanations when not Norwegian (A1–A2 learners). */
+  /** Language of the explanations in feedback saved when A1–A2 feedback came in the learner's language. */
   lang?: string;
 }
 
@@ -229,7 +229,7 @@ export interface SpeakingFeedback {
   /** Errors and unnatural phrasing; "original" is copied from one of the answers. */
   improvements: { original: string; better: string; explanation: string; topic?: string }[];
   model_answer: string;
-  /** Language of the explanations when not Norwegian (A1–A2 learners). */
+  /** Language of the explanations in feedback saved when A1–A2 feedback came in the learner's language. */
   lang?: string;
   /** Graded from the recordings (Gemini), so pronunciation is assessed too. */
   heard?: boolean;
@@ -268,7 +268,7 @@ export interface Profile {
   goal?: ExamGoal;
   examDate?: string;
   targetLevel?: Level;
-  /** Language code for translations and explanations, see lib/languages. */
+  /** Language code for word lookups and translations, see lib/languages. */
   nativeLanguage?: string;
 }
 

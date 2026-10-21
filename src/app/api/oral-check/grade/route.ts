@@ -1,7 +1,6 @@
 import { getSpeakingTask } from "@/content/speaking";
 import { fail } from "@/lib/ai-route";
 import { recordTokens, reserveCheck } from "@/lib/ai-usage";
-import { isLanguage } from "@/lib/languages";
 import { gradeTask, type GradeItem } from "@/lib/oral-ai";
 import { addOralCost, openOralCheck, takeGrade } from "@/lib/oral-checks";
 import { oralUser, recordingFrom } from "@/lib/oral-route";
@@ -44,8 +43,6 @@ export async function POST(req: Request) {
     sent = null;
   }
   if (!sent) return fail("Ugyldige svar.", 400);
-  const langValue = form.get("lang");
-  const lang = isLanguage(langValue) ? langValue : null;
 
   const check = await openOralCheck(user.userId, String(form.get("checkId") ?? ""), task.id);
   if (!check) return fail("AI-vurderingen er utløpt. Start prøven på nytt.", 403);
@@ -56,7 +53,7 @@ export async function POST(req: Request) {
   );
   if (vertexReady() && items.some((i) => i.recording)) {
     try {
-      const { transcripts, ...feedback } = await gradeTask(task, items, lang, (usd) => addOralCost(check.id, usd));
+      const { transcripts, ...feedback } = await gradeTask(task, items, (usd) => addOralCost(check.id, usd));
       return Response.json({ feedback, transcripts });
     } catch (err) {
       console.error("oral grading failed", err);
@@ -70,7 +67,7 @@ export async function POST(req: Request) {
     return fail("AI-vurderingen er ikke tilgjengelig akkurat nå. Prøv igjen om litt.", 503);
   }
   try {
-    const feedback = await assessSpeaking(task, turns, lang, (input, output) => recordTokens(user.userId, input, output, "speaking"));
+    const feedback = await assessSpeaking(task, turns, (input, output) => recordTokens(user.userId, input, output, "speaking"));
     return Response.json({ feedback });
   } catch (err) {
     console.error("oral grading fallback failed", err);
