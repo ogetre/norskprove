@@ -6,7 +6,7 @@
  */
 export const COMPANY = {
   /** The company, or the owner's name for a sole proprietorship (ENK). */
-  name: "",
+  name: "Yaroslav Polishchuk",
   /** Nine digits from Brønnøysundregistrene, with «MVA» after them when VAT-registered. */
   orgNr: "",
   /** Street, postcode and place. */
