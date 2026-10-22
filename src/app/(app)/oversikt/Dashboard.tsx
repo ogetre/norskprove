@@ -2,6 +2,7 @@
 
 import { SignInButton, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import { AccountCard } from "@/components/AccountCard";
 import { useState } from "react";
 import { ActivityChart, type DayCount } from "@/components/ActivityChart";
 import { CountUp } from "@/components/CountUp";
@@ -289,6 +290,8 @@ export function Dashboard({
           )}
         </section>
       </div>
+
+      {authEnabled && <AccountCard />}
 
       <details className="mt-10 text-sm text-granite">
         <summary className="cursor-pointer select-none hover:text-ink">Innstillinger</summary>
