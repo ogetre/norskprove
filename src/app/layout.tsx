@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Analytics } from "@vercel/analytics/next";
 import { Golos_Text, Unbounded } from "next/font/google";
 import { ProgressSync } from "@/components/ProgressSync";
+import { SiteAnalytics } from "@/components/SiteAnalytics";
 import { themeScript } from "@/lib/theme-script";
 import { authEnabled } from "@/lib/auth-config";
 import { clerkAppearance, clerkLocalization } from "@/lib/clerk-theme";
@@ -53,8 +53,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         ) : (
           children
         )}
-        {/* Page views without cookies, to see how much the free beta is used. */}
-        <Analytics />
+        <SiteAnalytics />
       </body>
     </html>
   );

@@ -239,7 +239,8 @@ async function ai(days: string[]): Promise<Stats["ai"]> {
 
 export async function loadStats(): Promise<Stats> {
   const days = lastDays(DAYS);
-  await ensureSchema();
+  // Without the database the sections show as missing, and the page still opens.
+  await ensureSchema().catch((err: unknown) => console.error("admin stats: no database", err));
   const [a, l, p, pr, x] = await Promise.all([
     safe("accounts", () => accounts(days)),
     safe("learners", () => learners(days)),
