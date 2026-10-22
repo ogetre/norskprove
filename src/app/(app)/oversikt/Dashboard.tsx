@@ -101,7 +101,7 @@ export function Dashboard({
   const [editing, setEditing] = useState(false);
 
   if (!hydrated) {
-    return <div className="h-[60vh] animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
+    return <div className="h-[60vh] animate-pulse rounded-2xl bg-surface/60" aria-busy="true" />;
   }
 
   const { profile } = state;

@@ -14,7 +14,7 @@ export default function SignInPage() {
     >
       {authEnabled ? (
         // Clerk reads the URL, so it renders after the static shell.
-        <Suspense fallback={<div className="h-[480px] animate-pulse rounded-xl bg-white/70" />}>
+        <Suspense fallback={<div className="h-[480px] animate-pulse rounded-xl bg-surface/70" />}>
           <SignIn />
         </Suspense>
       ) : (

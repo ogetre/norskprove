@@ -14,7 +14,7 @@ import { checkWriting } from "@/lib/writing-checks";
 function SavedText({ task, id }: { task: WritingTask; id: string }) {
   const state = useAppState();
   const hydrated = useHydrated();
-  if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
+  if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-surface/60" aria-busy="true" />;
 
   const sub = state.writing.find((w) => w.id === id && w.promptId === task.id);
   if (!sub) {

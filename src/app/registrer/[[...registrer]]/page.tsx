@@ -16,7 +16,7 @@ export default function SignUpPage() {
       {authEnabled ? (
         // Clerk reads the URL, so it renders after the static shell.
         <>
-          <Suspense fallback={<div className="h-[480px] animate-pulse rounded-xl bg-white/70" />}>
+          <Suspense fallback={<div className="h-[480px] animate-pulse rounded-xl bg-surface/70" />}>
             <SignUp />
           </Suspense>
           <p className="mt-4 text-center text-sm leading-relaxed text-granite">

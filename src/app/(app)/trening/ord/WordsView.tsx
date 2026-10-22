@@ -148,7 +148,7 @@ export function WordsView() {
   const state = useAppState();
   const hydrated = useHydrated();
   const [reviewing, setReviewing] = useState(false);
-  if (!hydrated) return <div className="h-64 animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
+  if (!hydrated) return <div className="h-64 animate-pulse rounded-2xl bg-surface/60" aria-busy="true" />;
 
   const words = state.words ?? [];
   const today = dayKey();

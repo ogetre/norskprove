@@ -207,7 +207,7 @@ export function TestRunner({ skill, minutes, tasks, afterResult, backHref }: Pro
 
   return (
     <div ref={topRef} className="fixed inset-0 z-40 overflow-y-auto bg-snow">
-      <div className="sticky top-0 z-10 border-b border-ice bg-white/95 backdrop-blur">
+      <div className="sticky top-0 z-10 border-b border-ice bg-surface/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-8">
           <span className="font-semibold">{SKILL_NAMES[skill]}</span>
           <span className="hidden text-sm text-granite sm:inline">Prøvetest</span>
