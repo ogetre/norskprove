@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PublicHeader } from "@/components/PublicHeader";
+import { MarkOwner } from "@/components/SiteAnalytics";
 import { authEnabled } from "@/lib/auth-config";
 import { adminAccess } from "@/lib/admin";
 import { DAYS, loadStats, type Stats } from "@/lib/admin-stats";
@@ -52,7 +53,8 @@ export default function AdminPage() {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-10 pb-20 sm:px-8">
         <h1 className="font-display text-3xl font-medium tracking-tight sm:text-4xl">Statistikk</h1>
         <p className="mt-2 text-granite">
-          Bare du ser denne siden. Tallene gjelder kontoer; elever uten konto ser du i Vercel Analytics.
+          Bare du ser denne siden. Tallene gjelder kontoer; elever uten konto ser du i Vercel Analytics. Besøkene dine
+          fra en nettleser der du har åpnet denne siden, telles ikke der.
         </p>
         <Suspense fallback={<div className="mt-8 h-96 animate-pulse rounded-2xl bg-surface" aria-busy="true" />}>
           <Dashboard />
@@ -69,6 +71,7 @@ async function Dashboard() {
   const s = await loadStats();
   return (
     <div className="mt-8 space-y-6">
+      <MarkOwner />
       <Tiles s={s} />
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title="Nye kontoer per dag" aside={s.accounts ? `${count(sumOf(s.accounts.daily))} siste ${DAYS} dager` : undefined}>
