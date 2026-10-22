@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ReportProblem } from "@/components/ReportProblem";
 import { TaskPractice } from "@/components/TaskPractice";
 import { SKILL_NAMES, type ExamTask, type Skill } from "@/lib/types";
 
@@ -39,6 +40,7 @@ export function SingleTask({ skill, task, next }: { skill: Skill; task: ExamTask
           </>
         )}
       />
+      <ReportProblem taskId={task.id} />
     </>
   );
 }

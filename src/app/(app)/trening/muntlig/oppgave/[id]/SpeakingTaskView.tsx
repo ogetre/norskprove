@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ReportProblem } from "@/components/ReportProblem";
 import { SpeakingSession } from "@/components/speaking/SpeakingSession";
 import type { SpeakingTask } from "@/content/speaking";
 
@@ -39,6 +40,7 @@ export function SpeakingTaskView({ task, next }: { task: SpeakingTask; next: { i
           </div>
         }
       />
+      <ReportProblem taskId={task.id} />
     </>
   );
 }

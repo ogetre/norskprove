@@ -45,6 +45,10 @@ export interface Stats {
     writingUsedUp: number;
     oralUsedUp: number;
   } | null;
+  /** Tasks solved by everyone, also without an account (api/activity). */
+  everyone: { daily: Daily; last7: number; withoutAccount7: number; bySkill: Count } | null;
+  /** The newest errors learners reported in tasks. */
+  reports: { at: string; path: string; taskId: string | null; message: string; account: boolean }[] | null;
 }
 
 const osloDay = (ms: number) => new Date(ms).toLocaleDateString("sv-SE", { timeZone: TZ });
@@ -237,16 +241,46 @@ async function ai(days: string[]): Promise<Stats["ai"]> {
   };
 }
 
+async function everyone(days: string[]): Promise<Stats["everyone"]> {
+  const rows = (await sql()`
+    SELECT day::text AS day, skill, account, sum(n)::int AS n FROM activity
+    WHERE day >= ${days[0]}::date GROUP BY 1, 2, 3`) as { day: string; skill: string; account: boolean; n: number }[];
+  const n = (r: { n: number }) => r.n;
+  const perDay = daily(days, tally(rows, (r) => r.day, n));
+  const week = new Set(days.slice(-7));
+  return {
+    daily: perDay,
+    last7: sum(perDay, -7, DAYS + 1),
+    withoutAccount7: rows.filter((r) => !r.account && week.has(r.day)).reduce((t, r) => t + r.n, 0),
+    bySkill: sorted(tally(rows, (r) => r.skill, n)),
+  };
+}
+
+async function reports(): Promise<Stats["reports"]> {
+  const rows = await sql()`
+    SELECT created_at, path, task_id, message, user_id IS NOT NULL AS account
+    FROM reports ORDER BY created_at DESC LIMIT 30`;
+  return rows.map((r) => ({
+    at: new Date(r.created_at as string).toLocaleString("nb-NO", { timeZone: TZ, dateStyle: "short", timeStyle: "short" }),
+    path: r.path as string,
+    taskId: r.task_id as string | null,
+    message: r.message as string,
+    account: r.account as boolean,
+  }));
+}
+
 export async function loadStats(): Promise<Stats> {
   const days = lastDays(DAYS);
   // Without the database the sections show as missing, and the page still opens.
   await ensureSchema().catch((err: unknown) => console.error("admin stats: no database", err));
-  const [a, l, p, pr, x] = await Promise.all([
+  const [a, l, p, pr, x, e, r] = await Promise.all([
     safe("accounts", () => accounts(days)),
     safe("learners", () => learners(days)),
     safe("practice", () => practice(days)),
     safe("profiles", () => profiles()),
     safe("ai", () => ai(days)),
+    safe("everyone", () => everyone(days)),
+    safe("reports", () => reports()),
   ]);
-  return { days, accounts: a, learners: l, practice: p, profiles: pr, ai: x };
+  return { days, accounts: a, learners: l, practice: p, profiles: pr, ai: x, everyone: e, reports: r };
 }

@@ -51,6 +51,26 @@ export function ensureSchema(): Promise<void> {
         grades     integer NOT NULL DEFAULT 0,
         cost_usd   numeric NOT NULL DEFAULT 0
       )`.then(() => db`CREATE INDEX IF NOT EXISTS oral_checks_user ON oral_checks (user_id, created_at)`),
+    // Errors learners report in a task, for the owner to fix (shown on /admin).
+    db`
+      CREATE TABLE IF NOT EXISTS reports (
+        id         bigserial PRIMARY KEY,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        user_id    text,
+        path       text NOT NULL,
+        task_id    text,
+        message    text NOT NULL
+      )`,
+    // Tasks solved per day by everyone, with and without an account; no ids, only counts.
+    db`
+      CREATE TABLE IF NOT EXISTS activity (
+        day     date NOT NULL,
+        skill   text NOT NULL,
+        mode    text NOT NULL,
+        account boolean NOT NULL,
+        n       integer NOT NULL DEFAULT 0,
+        PRIMARY KEY (day, skill, mode, account)
+      )`,
     db`
       CREATE TABLE IF NOT EXISTS ai_cache (
         key        text PRIMARY KEY,

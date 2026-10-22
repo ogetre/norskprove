@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ReportProblem } from "@/components/ReportProblem";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { WritingFeedback } from "@/components/writing/WritingFeedback";
@@ -134,6 +135,7 @@ export function WritingTaskView({ task, next }: { task: WritingTask; next: { id:
           }
         />
       )}
+      <ReportProblem taskId={task.id} />
     </>
   );
 }

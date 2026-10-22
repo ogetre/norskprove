@@ -80,8 +80,8 @@ async function Dashboard() {
         <Card title="Aktive elever per dag" aside="med konto">
           {s.learners ? <DailyColumns data={s.learners.daily} /> : <Missing />}
         </Card>
-        <Card title="Oppgaver løst per dag" aside={s.practice ? `${count(sumOf(s.practice.daily))} siste ${DAYS} dager` : undefined}>
-          {s.practice ? <DailyColumns data={s.practice.daily} /> : <Missing />}
+        <Card title="Oppgaver løst per dag" aside="alle, også uten konto">
+          {s.everyone ? <DailyColumns data={s.everyone.daily} /> : <Missing />}
         </Card>
         <Card title="AI-kostnad per dag" aside="Gemini og Claude">
           {s.ai ? <DailyColumns data={s.ai.daily} format={dollars} /> : <Missing />}
@@ -90,6 +90,7 @@ async function Dashboard() {
       <Practice s={s} />
       <Profiles s={s} />
       <Ai s={s} />
+      <Reports s={s} />
       <div className="flex flex-wrap gap-3">
         {LINKS.map((l) => (
           <a
@@ -125,9 +126,9 @@ function Tiles({ s }: { s: Stats }) {
         detail={a && `${count(a.active30)} siste 30 dager`}
       />
       <StatTile
-        label="Oppgaver siste 7 dager"
-        value={s.practice ? count(s.practice.last7) : "–"}
-        detail={s.practice && <Change now={s.practice.last7} before={s.practice.prev7} />}
+        label="Oppgaver løst siste 7 dager"
+        value={s.everyone ? count(s.everyone.last7) : "–"}
+        detail={s.everyone && `${count(s.everyone.withoutAccount7)} av dem uten konto`}
       />
       <StatTile
         label="AI denne måneden"
@@ -223,6 +224,34 @@ function Ai({ s }: { s: Stats }) {
         Har brukt opp månedens gratis vurderinger: {count(ai.writingUsedUp)} på skriving (av {BETA_WRITING_CHECKS}),{" "}
         {count(ai.oralUsedUp)} på muntlig (av {BETA_ORAL_CHECKS}).
       </p>
+    </Card>
+  );
+}
+
+function Reports({ s }: { s: Stats }) {
+  const r = s.reports;
+  return (
+    <Card title="Meldte feil" aside={r && r.length > 0 ? `de ${r.length} nyeste` : undefined}>
+      {!r ? (
+        <Missing />
+      ) : r.length === 0 ? (
+        <p className="text-sm text-granite">Ingen har meldt feil ennå.</p>
+      ) : (
+        <ul className="divide-y divide-[var(--grid)]">
+          {r.map((x, i) => (
+            <li key={i} className="py-3 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-granite">
+                <span className="tabular-nums">{x.at}</span>
+                <a href={x.path} className="font-medium text-fjord underline-offset-4 hover:underline">
+                  {x.path}
+                </a>
+                <span>{x.account ? "med konto" : "uten konto"}</span>
+              </div>
+              <p className="mt-1 whitespace-pre-line">{x.message}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

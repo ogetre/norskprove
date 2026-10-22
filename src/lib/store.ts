@@ -14,6 +14,7 @@ import type {
   WritingFeedback,
   WritingSubmission,
 } from "./types";
+import { countActivity } from "./activity";
 import { clearAllUnfinished } from "./unfinished";
 
 /*
@@ -125,6 +126,7 @@ export function saveTestLevels(levels: Partial<Record<Skill, Level>>) {
 }
 
 export function recordAttempt(a: Omit<Attempt, "id" | "at">) {
+  countActivity(a.skill, a.mode);
   update((s) =>
     markActive(
       {
