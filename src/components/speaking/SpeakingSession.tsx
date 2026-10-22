@@ -650,7 +650,7 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
   if (!fullscreen) return body;
   return (
     <div className="fixed inset-0 z-40 overflow-y-auto bg-snow">
-      <div className="sticky top-0 z-10 border-b border-ice bg-white/95 backdrop-blur">
+      <div className="sticky top-0 z-10 border-b border-ice bg-surface/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-8">
           <span className="font-semibold">{title}</span>
           <span className="ml-auto text-sm text-granite tabular-nums">
@@ -667,6 +667,6 @@ function Session({ tasks, mode, fullscreen, after, title, resume, onProgress, on
 /** Spoken practice: the examiner asks out loud, you answer into the microphone. */
 export function SpeakingSession(props: Omit<SessionProps, "fullscreen"> & { fullscreen?: boolean }) {
   const hydrated = useHydrated();
-  if (!hydrated) return <div className="h-80 animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
+  if (!hydrated) return <div className="h-80 animate-pulse rounded-2xl bg-surface/60" aria-busy="true" />;
   return <Session {...props} fullscreen={props.fullscreen ?? false} />;
 }

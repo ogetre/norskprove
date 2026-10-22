@@ -126,6 +126,6 @@ function Practice({
 export function WritingPractice(props: { task: WritingTask; mode: Mode; timed?: boolean; after?: ReactNode }) {
   const hydrated = useHydrated();
   // Drafts live in localStorage, so the editor mounts after hydration.
-  if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
+  if (!hydrated) return <div className="h-96 animate-pulse rounded-2xl bg-surface/60" aria-busy="true" />;
   return <Practice key={props.task.id} {...props} timed={props.timed ?? false} />;
 }

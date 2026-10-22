@@ -46,7 +46,7 @@ export default function TrialMenuPage() {
                   {body}
                 </Link>
               ) : (
-                <div aria-disabled="true" className="flex h-full gap-5 rounded-2xl bg-white/60 p-6 ring-1 ring-ice">
+                <div aria-disabled="true" className="flex h-full gap-5 rounded-2xl bg-surface/60 p-6 ring-1 ring-ice">
                   {body}
                 </div>
               )}

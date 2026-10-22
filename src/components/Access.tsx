@@ -73,7 +73,7 @@ export function planName(plan: PlanId | null): string {
 export function Paywall({ children, skill, feature }: { children: ReactNode; skill: Skill; feature: string }) {
   const { plan, signedIn, loading, dev } = useAccess();
 
-  if (loading) return <div className="h-64 animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
+  if (loading) return <div className="h-64 animate-pulse rounded-2xl bg-surface/60" aria-busy="true" />;
   if (dev || planCovers(plan, skill)) return <>{children}</>;
 
   const needsUpgrade = plan !== null;

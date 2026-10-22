@@ -16,7 +16,7 @@ export function OralTestAccess({ bands }: { bands: ComponentProps<typeof Speakin
   const covered = dev || planCovers(plan, "muntlig");
 
   if (loading || (!covered && signedIn && oral.state === "loading")) {
-    return <div className="h-64 animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
+    return <div className="h-64 animate-pulse rounded-2xl bg-surface/60" aria-busy="true" />;
   }
   if (covered) return <SpeakingExam bands={bands} />;
   if (oral.state === "ready" && oral.allowance.free && (oral.allowance.left !== 0 || oral.open)) {

@@ -301,7 +301,7 @@ export function ErrorsView() {
   const hydrated = useHydrated();
   const [round, setRound] = useState<string[] | null>(null);
   const drills = useMemo(() => collectDrills(state), [state]);
-  if (!hydrated) return <div className="h-64 animate-pulse rounded-2xl bg-white/60" aria-busy="true" />;
+  if (!hydrated) return <div className="h-64 animate-pulse rounded-2xl bg-surface/60" aria-busy="true" />;
 
   const today = dayKey();
   const queue = reviewQueue(drills, state.srs, today);
