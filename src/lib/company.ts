@@ -12,7 +12,7 @@ export const COMPANY = {
   /** Street, postcode and place. */
   address: "",
   /** Where learners reach support, for example kontakt@norskproveklar.no. */
-  email: "",
+  email: "norskproveklar@gmail.com",
 };
 
 /** When the terms and the privacy policy last changed. */
