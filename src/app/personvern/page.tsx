@@ -66,8 +66,15 @@ export default function PrivacyPage() {
           <li>
             <strong>Besøksstatistikk.</strong> Vi teller hvilke sider som blir besøkt, og hvor besøkende kommer fra
             (land, enhetstype, nettleser og nettstedet som lenket hit), med Vercel Web Analytics. Statistikken bruker
-            ingen informasjonskapsler og kan ikke knyttes til deg eller kontoen din. Vi bruker den til å se hvilke deler
-            av tjenesten som er nyttige. Grunnlaget er vår berettigede interesse.
+            ingen informasjonskapsler og kan ikke knyttes til deg eller kontoen din. I tillegg teller vi hvor mange
+            oppgaver som blir løst i hver del av prøven, og om det skjer med eller uten konto, men ikke hvem som løste
+            dem. Vi bruker dette til å se hvilke deler av tjenesten som er nyttige. Grunnlaget er vår berettigede
+            interesse.
+          </li>
+          <li>
+            <strong>Feil du melder.</strong> Når du melder en feil i en oppgave, lagrer vi det du skriver, hvilken side
+            det gjelder, og konto-ID-en din hvis du er logget inn. Vi bruker det bare til å rette feilen. Ikke skriv
+            personopplysninger i meldingen. Grunnlaget er vår berettigede interesse.
           </li>
         </List>
         <p>
@@ -121,6 +128,7 @@ export default function PrivacyPage() {
         <List>
           <li>Konto og fremgang: så lenge du har konto. Sletter du kontoen, sletter vi fremgangen innen 30 dager.</li>
           <li>Lydopptak: lagres ikke hos oss.</li>
+          <li>Feil du melder: til feilen er rettet, og høyst ett år.</li>
           <li>Tellingen av AI-bruk: som statistikk uten innholdet i forespørslene.</li>
           <li>Opplysninger om betaling: i fem år, slik bokføringsloven krever.</li>
           <li>Serverlogger: i kort tid, for drift og sikkerhet.</li>
