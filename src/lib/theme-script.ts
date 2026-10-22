@@ -1,7 +1,4 @@
 export const THEME_KEY = "theme";
 
-/**
- * Runs before first paint (inlined in <head>) so the page never flashes the wrong theme. The site is light
- * unless the learner has chosen dark with the toggle.
- */
-export const themeScript = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t!=="dark"){t="light"}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="light"}})()`;
+/** Runs before first paint (inlined in <head>) so the page never flashes the wrong theme. */
+export const themeScript = `(function(){try{var t=localStorage.getItem("${THEME_KEY}");if(t!=="light"&&t!=="dark"){t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}document.documentElement.dataset.theme=t}catch(e){document.documentElement.dataset.theme="light"}})()`;
